@@ -1,0 +1,130 @@
+.property-panel {
+  width: 350px;
+  background-color: white;
+  border-left: 1px solid rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -2px 0 4px rgba(0, 0, 0, 0.05);
+}
+
+.app.dark .property-panel {
+  background-color: #2d2d2d;
+  border-left-color: rgba(255, 255, 255, 0.1);
+}
+
+.property-panel-empty {
+  padding: 2rem;
+  text-align: center;
+  color: #999;
+}
+
+.app.dark .property-panel-empty {
+  color: #666;
+}
+
+.property-panel-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.app.dark .property-panel-header {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.property-panel-header h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.app.dark .property-panel-header h3 {
+  color: #e0e0e0;
+}
+
+.node-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.node-type-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  background-color: #e9ecef;
+  color: #495057;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.app.dark .node-type-badge {
+  background-color: #4a4a4a;
+  color: #e0e0e0;
+}
+
+.property-panel-content {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.property-group {
+  margin-bottom: 1.5rem;
+}
+
+.property-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.app.dark .property-label {
+  color: #999;
+}
+
+.property-input,
+.property-textarea,
+.property-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background-color: white;
+  color: #333;
+}
+
+.app.dark .property-input,
+.app.dark .property-textarea,
+.app.dark .property-select {
+  background-color: #3a3a3a;
+  border-color: #4a4a4a;
+  color: #e0e0e0;
+}
+
+.property-input:focus,
+.property-textarea:focus,
+.property-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.app.dark .property-input:focus,
+.app.dark .property-textarea:focus,
+.app.dark .property-select:focus {
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
+}
+
+.property-textarea {
+  resize: vertical;
+  font-family: 'Monaco', 'Courier New', monospace;
+}
+
