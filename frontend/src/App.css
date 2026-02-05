@@ -42,6 +42,56 @@
   align-items: center;
 }
 
+.view-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.app.dark .view-toggle {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.view-button {
+  padding: 0.5rem 1.25rem;
+  background-color: transparent;
+  color: var(--text-secondary, #666);
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  border-right: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.view-button:last-child {
+  border-right: none;
+}
+
+.app.dark .view-button {
+  color: #aaa;
+  border-right-color: rgba(255, 255, 255, 0.1);
+}
+
+.view-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.app.dark .view-button:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.view-button.active {
+  background-color: #007bff;
+  color: white;
+}
+
+.view-button.active:hover {
+  background-color: #0056b3;
+}
+
 .save-button {
   padding: 0.5rem 1.5rem;
   background-color: #007bff;

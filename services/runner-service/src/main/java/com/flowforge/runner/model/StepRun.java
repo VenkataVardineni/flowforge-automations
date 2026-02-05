@@ -1,8 +1,6 @@
 package com.flowforge.runner.model;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.Type;
-import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
 import java.time.LocalDateTime;
 import java.util.UUID;
 

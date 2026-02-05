@@ -48,7 +48,8 @@ public class RunService {
         run = runRepository.save(run);
 
         // Stub execution - in real implementation, this would execute the workflow graph
-        CompletableFuture.runAsync(() -> executeWorkflow(run, request.getGraph()));
+        final UUID runId = run.getId();
+        CompletableFuture.runAsync(() -> executeWorkflow(runId, request.getGraph()));
 
         List<StepRun> steps = stepRunRepository.findByRunIdOrderByStartedAtAsc(run.getId());
         return new RunResponse(run, steps);
@@ -61,21 +62,23 @@ public class RunService {
         return new RunResponse(run, steps);
     }
 
-    private void executeWorkflow(Run run, Map<String, Object> graph) {
+    private void executeWorkflow(UUID runId, Map<String, Object> graph) {
         try {
+            Run run = runRepository.findById(runId)
+                    .orElseThrow(() -> new RuntimeException("Run not found"));
             run.setStatus(Run.RunStatus.RUNNING);
             runRepository.save(run);
 
             // Stub: Create a sample step run
             StepRun stepRun = new StepRun();
-            stepRun.setRunId(run.getId());
+            stepRun.setRunId(runId);
             stepRun.setNodeId("stub-node-1");
             stepRun.setStatus(StepRun.StepStatus.RUNNING);
             stepRun.setStartedAt(LocalDateTime.now());
             stepRun = stepRunRepository.save(stepRun);
 
             // Send update via WebSocket
-            sendStepUpdate(run.getId(), stepRun);
+            sendStepUpdate(runId, stepRun);
 
             // Simulate execution delay
             Thread.sleep(1000);
@@ -88,13 +91,15 @@ public class RunService {
                 // Ignore
             }
             stepRunRepository.save(stepRun);
-            sendStepUpdate(run.getId(), stepRun);
+            sendStepUpdate(runId, stepRun);
 
             run.setStatus(Run.RunStatus.COMPLETED);
             run.setFinishedAt(LocalDateTime.now());
             runRepository.save(run);
 
         } catch (Exception e) {
+            Run run = runRepository.findById(runId)
+                    .orElseThrow(() -> new RuntimeException("Run not found"));
             run.setStatus(Run.RunStatus.FAILED);
             run.setErrorMessage(e.getMessage());
             run.setFinishedAt(LocalDateTime.now());

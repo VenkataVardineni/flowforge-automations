@@ -1,10 +1,7 @@
 package com.flowforge.workflow.model;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.Type;
-import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -20,7 +17,7 @@ public class WorkflowVersion {
     @Column(nullable = false)
     private Integer version;
 
-    @Column(name = "graph_json", columnDefinition = "jsonb")
+    @Column(name = "graph_json", columnDefinition = "CLOB")
     private String graphJson;
 
     @Column(name = "created_at", nullable = false, updatable = false)

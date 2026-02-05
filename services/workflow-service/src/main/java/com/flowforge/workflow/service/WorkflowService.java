@@ -74,6 +74,13 @@ public class WorkflowService {
         return workflowVersionRepository.findByWorkflowIdOrderByVersionDesc(workflowId);
     }
 
+    public List<WorkflowResponse> getAllWorkflows(UUID workspaceId) {
+        List<Workflow> workflows = workflowRepository.findByWorkspaceId(workspaceId);
+        return workflows.stream()
+                .map(this::getWorkflowResponse)
+                .collect(Collectors.toList());
+    }
+
     private void saveWorkflowVersion(UUID workflowId, Integer version, Map<String, Object> graph) {
         try {
             String graphJson = objectMapper.writeValueAsString(graph);

@@ -2,9 +2,9 @@ spring:
   application:
     name: runner-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/flowforge
-    username: flowforge
-    password: flowforge
+    url: jdbc:postgresql://localhost:4320/flowforge
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:

@@ -1,0 +1,236 @@
+.workflows-list-container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.workflows-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--border-color, #e0e0e0);
+}
+
+.workflows-list-header h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.refresh-button,
+.create-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.refresh-button {
+  background-color: var(--bg-secondary, #f5f5f5);
+  color: var(--text-primary, #333);
+}
+
+.refresh-button:hover {
+  background-color: var(--bg-hover, #e8e8e8);
+}
+
+.create-button {
+  background-color: var(--primary-color, #007bff);
+  color: white;
+}
+
+.create-button:hover {
+  background-color: var(--primary-hover, #0056b3);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+.loading-state,
+.error-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary, #666);
+}
+
+.error-state button {
+  margin-top: 16px;
+  padding: 10px 20px;
+  background-color: var(--primary-color, #007bff);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.empty-workflows {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text-secondary, #666);
+}
+
+.empty-workflows p {
+  font-size: 18px;
+  margin-bottom: 24px;
+}
+
+.workflows-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.workflow-card {
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.workflow-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: var(--primary-color, #007bff);
+}
+
+.workflow-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.workflow-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+  flex: 1;
+  margin-right: 12px;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status-draft {
+  background-color: #f0f0f0;
+  color: #666;
+}
+
+.status-active {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-archived {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.workflow-card-body {
+  margin-bottom: 16px;
+}
+
+.workflow-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.info-label {
+  color: var(--text-secondary, #666);
+}
+
+.info-value {
+  color: var(--text-primary, #333);
+  font-weight: 500;
+}
+
+.workflow-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+}
+
+.open-button {
+  padding: 8px 16px;
+  background-color: var(--primary-color, #007bff);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.open-button:hover {
+  background-color: var(--primary-hover, #0056b3);
+}
+
+/* Dark mode support */
+.dark .workflows-list-header {
+  border-bottom-color: #444;
+}
+
+.dark .workflows-list-header h2 {
+  color: #fff;
+}
+
+.dark .refresh-button {
+  background-color: #333;
+  color: #fff;
+}
+
+.dark .refresh-button:hover {
+  background-color: #444;
+}
+
+.dark .workflow-card {
+  background: #2a2a2a;
+  border-color: #444;
+}
+
+.dark .workflow-card:hover {
+  border-color: #007bff;
+}
+
+.dark .workflow-name {
+  color: #fff;
+}
+
+.dark .info-label {
+  color: #aaa;
+}
+
+.dark .info-value {
+  color: #fff;
+}
+
+.dark .workflow-card-footer {
+  border-top-color: #444;
+}
+

@@ -52,5 +52,12 @@ public class WorkflowController {
         List<WorkflowVersion> versions = workflowService.getVersions(id);
         return ResponseEntity.ok(versions);
     }
+
+    @GetMapping
+    public ResponseEntity<List<WorkflowResponse>> getAllWorkflows(
+            @RequestParam(required = false, defaultValue = "00000000-0000-0000-0000-000000000000") UUID workspaceId) {
+        List<WorkflowResponse> workflows = workflowService.getAllWorkflows(workspaceId);
+        return ResponseEntity.ok(workflows);
+    }
 }
 

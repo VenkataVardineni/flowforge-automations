@@ -6,12 +6,19 @@
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
+    "ajv": "^8.12.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-flow-renderer": "^10.3.17",
-    "react-scripts": "5.0.1",
+    "react-scripts": "^5.0.1",
     "typescript": "^5.3.3",
     "web-vitals": "^3.5.0"
+  },
+  "overrides": {
+    "fork-ts-checker-webpack-plugin": {
+      "ajv-keywords": "^5.1.0",
+      "ajv": "^8.12.0"
+    }
   },
   "scripts": {
     "start": "react-scripts start",
@@ -35,6 +42,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "patch-package": "^8.0.1"
   }
 }
-
