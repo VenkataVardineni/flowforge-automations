@@ -42,6 +42,92 @@
   align-items: center;
 }
 
+.secondary-button {
+  padding: 0.5rem 1.25rem;
+  background-color: #f5f5f5;
+  color: #333;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.secondary-button:hover {
+  background-color: #e8e8e8;
+  transform: translateY(-1px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.secondary-button:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.automation-node {
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  padding: 8px 10px;
+  min-width: 180px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.app.dark .automation-node {
+  background: #2a2a2a;
+  border-color: #444;
+}
+
+.automation-node-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.automation-node-icon {
+  font-size: 1.1rem;
+}
+
+.automation-node-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.automation-node-body {
+  font-size: 0.75rem;
+  color: #555;
+}
+
+.app.dark .automation-node-body {
+  color: #ccc;
+}
+
+.automation-node-empty {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.automation-node-preview-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.automation-node-preview-row + .automation-node-preview-row {
+  margin-top: 2px;
+}
+
+.automation-node-preview .preview-key {
+  font-weight: 500;
+}
+
+.automation-node-preview .preview-value {
+  opacity: 0.8;
+}
+
 .view-toggle {
   display: flex;
   gap: 0;

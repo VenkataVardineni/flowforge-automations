@@ -10,6 +10,7 @@ import ReactFlow, {
 } from 'react-flow-renderer';
 import { WorkflowNode, WorkflowEdge } from '../App';
 import './WorkflowCanvas.css';
+import { getNodeDefinition } from '../nodes/definitions';
 
 interface WorkflowCanvasProps {
   nodes: WorkflowNode[];
@@ -55,7 +56,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
       const newNode: WorkflowNode = {
         id: `${type}-${Date.now()}`,
-        type: 'default',
+        type,
         position,
         data: {
           label,
@@ -83,6 +84,49 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     onNodeSelect(null);
   }, [onNodeSelect]);
 
+  const nodeTypes = {
+    webhookTrigger: AutomationNode,
+    scheduleTrigger: AutomationNode,
+    httpRequest: AutomationNode,
+    transform: AutomationNode,
+    ifCondition: AutomationNode,
+    postgresWrite: AutomationNode,
+    notification: AutomationNode,
+  };
+
+  // Generic node renderer that uses the schema definitions for display
+  function AutomationNode({ data }: { data: any }) {
+    const def = getNodeDefinition(data.type);
+    return (
+      <div className="automation-node">
+        <div className="automation-node-header">
+          <span className="automation-node-icon">{def?.icon || '⬜'}</span>
+          <span className="automation-node-title">{def?.label || data.label}</span>
+        </div>
+        <div className="automation-node-body">
+          {data.properties && Object.keys(data.properties).length > 0 ? (
+            <div className="automation-node-preview">
+              {Object.entries(data.properties)
+                .slice(0, 3)
+                .map(([key, value]) => (
+                  <div key={key} className="automation-node-preview-row">
+                    <span className="preview-key">{key}</span>
+                    <span className="preview-value">
+                      {String(value).length > 24
+                        ? String(value).slice(0, 24) + '…'
+                        : String(value)}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <div className="automation-node-empty">No configuration yet</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="workflow-canvas" ref={reactFlowWrapper}>
       <ReactFlow
@@ -96,6 +140,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         onDragOver={onDragOver}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
+        nodeTypes={nodeTypes}
         fitView
         snapToGrid
         snapGrid={[20, 20]}
@@ -111,4 +156,5 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 };
 
 export default WorkflowCanvas;
+
 

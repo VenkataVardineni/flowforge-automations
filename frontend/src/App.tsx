@@ -6,6 +6,7 @@ import PropertyPanel from './components/PropertyPanel';
 import ThemeToggle from './components/ThemeToggle';
 import EmptyState from './components/EmptyState';
 import WorkflowsList, { Workflow } from './components/WorkflowsList';
+import { getNodeDefinition, isTriggerNode } from './nodes/definitions';
 import './App.css';
 
 export interface NodeData {
@@ -86,7 +87,7 @@ function App() {
   const addNode = useCallback((nodeType: string, label: string) => {
     const newNode: WorkflowNode = {
       id: `${nodeType}-${Date.now()}`,
-      type: 'default',
+      type: nodeType,
       position: {
         x: Math.random() * 400 + 100,
         y: Math.random() * 400 + 100,
@@ -197,6 +198,80 @@ function App() {
     setView('canvas');
   }, []);
 
+  const validateWorkflow = useCallback(() => {
+    const errors: string[] = [];
+
+    // Rule 1: exactly one trigger node
+    const triggerNodes = nodes.filter((n) => isTriggerNode(n));
+    if (triggerNodes.length === 0) {
+      errors.push('Workflow must contain exactly one trigger node (found 0).');
+    } else if (triggerNodes.length > 1) {
+      errors.push(`Workflow must contain exactly one trigger node (found ${triggerNodes.length}).`);
+    }
+
+    // Rule 2: all required config fields present
+    nodes.forEach((node) => {
+      const def = getNodeDefinition(node.data.type);
+      if (!def) {
+        return;
+      }
+      def.fields.forEach((field) => {
+        if (field.required) {
+          const value = node.data.properties?.[field.key];
+          if (value === undefined || value === null || String(value).trim() === '') {
+            errors.push(
+              `Node "${def.label}" (${node.id}) is missing required field "${field.label}".`
+            );
+          }
+        }
+      });
+    });
+
+    // Rule 3: no cycles in graph (simple DFS)
+    const adj: Record<string, string[]> = {};
+    nodes.forEach((n) => {
+      adj[n.id] = [];
+    });
+    edges.forEach((e) => {
+      if (!adj[e.source]) {
+        adj[e.source] = [];
+      }
+      adj[e.source].push(e.target);
+    });
+
+    const visiting = new Set<string>();
+    const visited = new Set<string>();
+    let hasCycle = false;
+
+    const dfs = (nodeId: string) => {
+      if (visiting.has(nodeId)) {
+        hasCycle = true;
+        return;
+      }
+      if (visited.has(nodeId) || hasCycle) return;
+      visiting.add(nodeId);
+      (adj[nodeId] || []).forEach(dfs);
+      visiting.delete(nodeId);
+      visited.add(nodeId);
+    };
+
+    nodes.forEach((n) => {
+      if (!visited.has(n.id)) {
+        dfs(n.id);
+      }
+    });
+
+    if (hasCycle) {
+      errors.push('Workflow graph contains cycles. Cycles are not allowed.');
+    }
+
+    if (errors.length === 0) {
+      alert('Workflow is valid ✅');
+    } else {
+      alert('Workflow has issues:\n\n' + errors.map((e) => `• ${e}`).join('\n'));
+    }
+  }, [nodes, edges]);
+
   const hasWorkflow = nodes.length > 0;
 
   return (
@@ -219,10 +294,17 @@ function App() {
             </button>
           </div>
           <ThemeToggle isDarkMode={isDarkMode} onToggle={setIsDarkMode} />
-          {view === 'canvas' && hasWorkflow && (
-            <button className="save-button" onClick={saveWorkflow}>
-              Save Workflow
-            </button>
+          {view === 'canvas' && (
+            <>
+              <button className="secondary-button" onClick={validateWorkflow}>
+                Validate Workflow
+              </button>
+              {hasWorkflow && (
+                <button className="save-button" onClick={saveWorkflow}>
+                  Save Workflow
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

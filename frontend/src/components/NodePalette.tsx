@@ -1,24 +1,23 @@
 import React from 'react';
 import './NodePalette.css';
+import { getAllNodeDefinitions, NodeDefinition } from '../nodes/definitions';
 
 interface NodePaletteProps {
   onAddNode: (nodeType: string, label: string) => void;
 }
 
-const nodeTypes = [
-  { type: 'trigger', label: 'Webhook Trigger', icon: '🔔' },
-  { type: 'trigger', label: 'Schedule', icon: '⏰' },
-  { type: 'action', label: 'HTTP Call', icon: '🌐' },
-  { type: 'action', label: 'Postgres Write', icon: '💾' },
-  { type: 'action', label: 'Email Notification', icon: '📧' },
-  { type: 'transform', label: 'Transform', icon: '🔄' },
-  { type: 'transform', label: 'Filter', icon: '🔍' },
-  { type: 'transform', label: 'Condition', icon: '⚡' },
-];
-
 const NodePalette: React.FC<NodePaletteProps> = ({ onAddNode }) => {
-  const handleDragStart = (e: React.DragEvent, nodeType: string, label: string) => {
-    e.dataTransfer.setData('application/reactflow', JSON.stringify({ type: nodeType, label }));
+  const defs = getAllNodeDefinitions();
+
+  const triggers = defs.filter((d) => d.category === 'trigger');
+  const actions = defs.filter((d) => d.category === 'action');
+  const transforms = defs.filter((d) => d.category === 'transform');
+
+  const handleDragStart = (e: React.DragEvent, def: NodeDefinition) => {
+    e.dataTransfer.setData(
+      'application/reactflow',
+      JSON.stringify({ type: def.id, label: def.label })
+    );
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -27,55 +26,50 @@ const NodePalette: React.FC<NodePaletteProps> = ({ onAddNode }) => {
       <h2 className="palette-title">Nodes</h2>
       <div className="palette-section">
         <h3 className="section-title">Triggers</h3>
-        {nodeTypes
-          .filter((n) => n.type === 'trigger')
-          .map((node) => (
-            <div
-              key={node.label}
-              className="palette-node"
-              draggable
-              onDragStart={(e) => handleDragStart(e, node.type, node.label)}
-            >
-              <span className="node-icon">{node.icon}</span>
-              <span className="node-label">{node.label}</span>
-            </div>
-          ))}
+        {triggers.map((node) => (
+          <div
+            key={node.id}
+            className="palette-node"
+            draggable
+            onDragStart={(e) => handleDragStart(e, node)}
+          >
+            <span className="node-icon">{node.icon}</span>
+            <span className="node-label">{node.label}</span>
+          </div>
+        ))}
       </div>
       <div className="palette-section">
         <h3 className="section-title">Actions</h3>
-        {nodeTypes
-          .filter((n) => n.type === 'action')
-          .map((node) => (
-            <div
-              key={node.label}
-              className="palette-node"
-              draggable
-              onDragStart={(e) => handleDragStart(e, node.type, node.label)}
-            >
-              <span className="node-icon">{node.icon}</span>
-              <span className="node-label">{node.label}</span>
-            </div>
-          ))}
+        {actions.map((node) => (
+          <div
+            key={node.id}
+            className="palette-node"
+            draggable
+            onDragStart={(e) => handleDragStart(e, node)}
+          >
+            <span className="node-icon">{node.icon}</span>
+            <span className="node-label">{node.label}</span>
+          </div>
+        ))}
       </div>
       <div className="palette-section">
         <h3 className="section-title">Transformations</h3>
-        {nodeTypes
-          .filter((n) => n.type === 'transform')
-          .map((node) => (
-            <div
-              key={node.label}
-              className="palette-node"
-              draggable
-              onDragStart={(e) => handleDragStart(e, node.type, node.label)}
-            >
-              <span className="node-icon">{node.icon}</span>
-              <span className="node-label">{node.label}</span>
-            </div>
-          ))}
+        {transforms.map((node) => (
+          <div
+            key={node.id}
+            className="palette-node"
+            draggable
+            onDragStart={(e) => handleDragStart(e, node)}
+          >
+            <span className="node-icon">{node.icon}</span>
+            <span className="node-label">{node.label}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
 };
 
 export default NodePalette;
+
 

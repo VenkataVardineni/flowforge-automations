@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { WorkflowNode } from '../App';
 import './PropertyPanel.css';
+import { getNodeDefinition, NodeField } from '../nodes/definitions';
 
 interface PropertyPanelProps {
   node: WorkflowNode | null;
@@ -26,28 +27,6 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ node, onUpdateProperties 
     }
   };
 
-  const getPropertySchema = (nodeType: string) => {
-    const schemas: Record<string, Array<{ key: string; label: string; type: string; placeholder?: string }>> = {
-      trigger: [
-        { key: 'url', label: 'Webhook URL', type: 'text', placeholder: 'https://example.com/webhook' },
-        { key: 'method', label: 'HTTP Method', type: 'select', placeholder: 'POST' },
-      ],
-      action: [
-        { key: 'url', label: 'Request URL', type: 'text', placeholder: 'https://api.example.com' },
-        { key: 'method', label: 'HTTP Method', type: 'select', placeholder: 'GET' },
-        { key: 'headers', label: 'Headers (JSON)', type: 'textarea', placeholder: '{"Authorization": "Bearer token"}' },
-        { key: 'body', label: 'Body (JSON)', type: 'textarea', placeholder: '{"key": "value"}' },
-      ],
-      transform: [
-        { key: 'script', label: 'Transform Script', type: 'textarea', placeholder: 'return data.map(...)' },
-      ],
-    };
-
-    return schemas[nodeType] || [
-      { key: 'config', label: 'Configuration', type: 'textarea', placeholder: 'Enter configuration as JSON' },
-    ];
-  };
-
   if (!node) {
     return (
       <div className="property-panel">
@@ -58,14 +37,17 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ node, onUpdateProperties 
     );
   }
 
-  const schema = getPropertySchema(node.data.type);
+  const definition = getNodeDefinition(node.data.type);
+  const schema: NodeField[] = definition?.fields || [];
 
   return (
     <div className="property-panel">
       <div className="property-panel-header">
         <h3>Node Properties</h3>
         <div className="node-info">
-          <span className="node-type-badge">{node.data.type}</span>
+          <span className="node-type-badge">
+            {definition ? definition.label : node.data.type}
+          </span>
         </div>
       </div>
       <div className="property-panel-content">
@@ -96,15 +78,15 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ node, onUpdateProperties 
                 className="property-select"
               >
                 <option value="">Select...</option>
-                <option value="GET">GET</option>
-                <option value="POST">POST</option>
-                <option value="PUT">PUT</option>
-                <option value="DELETE">DELETE</option>
-                <option value="PATCH">PATCH</option>
+                {(field.options || []).map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
               </select>
             ) : (
               <input
-                type={field.type}
+                type={field.type === 'number' ? 'number' : 'text'}
                 value={properties[field.key] || ''}
                 onChange={(e) => handlePropertyChange(field.key, e.target.value)}
                 placeholder={field.placeholder}
@@ -119,4 +101,5 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ node, onUpdateProperties 
 };
 
 export default PropertyPanel;
+
 
