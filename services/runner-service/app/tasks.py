@@ -30,8 +30,12 @@ def execute_workflow(self, run_id: str):
     """
     Main workflow execution task.
     This is enqueued when a run is created.
+    Note: Celery tasks are sync, so we use asyncio.run for async operations.
     """
-    db = self.db
+    asyncio.run(_execute_workflow_async(run_id, self.db))
+
+async def _execute_workflow_async(run_id: str, db):
+    """Async workflow execution"""
     run_uuid = UUID(run_id)
     
     try:
@@ -52,14 +56,34 @@ def execute_workflow(self, run_id: str):
             "started_at": run.started_at.isoformat()
         })
         
-        # TODO: Fetch workflow graph from workflow-service
-        # For now, this is a placeholder that will be implemented in Commit #4
-        logger.info(f"Executing workflow for run {run_id}")
+        # Fetch workflow graph from workflow-service
+        workflow_service_url = os.getenv("WORKFLOW_SERVICE_URL", "http://workflow-service:8080")
+        try:
+            async with httpx.AsyncClient() as client:
+                workflow_response = await client.get(
+                    f"{workflow_service_url}/api/workflows/{run.workflow_id}"
+                )
+                if workflow_response.status_code != 200:
+                    raise Exception(f"Failed to fetch workflow: {workflow_response.status_code}")
+                
+                workflow_data = workflow_response.json()
+                graph = workflow_data.get("graph", {})
+                nodes = graph.get("nodes", [])
+                edges = graph.get("edges", [])
+                
+                if not nodes:
+                    raise Exception("Workflow has no nodes")
+                
+                logger.info(f"Fetched workflow graph with {len(nodes)} nodes")
+        except Exception as e:
+            logger.error(f"Failed to fetch workflow: {e}")
+            raise
         
-        # Simulate execution (will be replaced with real node execution)
-        # This is just to demonstrate the queue is working
+        # Execute workflow nodes
+        await execute_workflow_nodes(db, run_uuid, nodes, edges)
         
-        # Mark as completed for now
+        # Mark as completed
+        run = db.query(Run).filter(Run.id == run_uuid).first()
         run.status = RunStatus.COMPLETED
         run.finished_at = datetime.utcnow()
         db.commit()
