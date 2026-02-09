@@ -6,35 +6,90 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                        Frontend (React)                      │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Workflow     │  │ Execution    │  │ Schedules    │      │
-│  │ Canvas       │  │ Logs         │  │ Manager      │      │
+│  │ Workflow     │  │ Run Console  │  │ Timeline     │      │
+│  │ Canvas       │  │ (SSE)        │  │ View         │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘      │
 └─────────────────────────────────────────────────────────────┘
                             │
-                            │ HTTP/WebSocket
+                            │ HTTP/SSE
                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    API Gateway (Spring Boot)                 │
-│              Routes requests to appropriate services         │
-└─────────────────────────────────────────────────────────────┘
-                            │
         ┌───────────────────┼───────────────────┐
         │                   │                   │
         ▼                   ▼                   ▼
 ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
 │  Workflow    │  │   Runner     │  │  Scheduler   │
-│  Service     │  │   Service    │  │   Service    │
-│  (CRUD)      │  │  (Execution) │  │  (Cron)      │
+│  Service     │  │   API        │  │   Service    │
+│  (Spring)    │  │  (FastAPI)   │  │  (Future)    │
+│  Port: 8080  │  │  Port: 8081  │  │              │
 └──────────────┘  └──────────────┘  └──────────────┘
         │                   │                   │
-        └───────────────────┼───────────────────┘
+        │                   │                   │
+        ▼                   ▼                   ▼
+┌──────────────┐  ┌──────────────┐
+│  PostgreSQL  │  │    Redis     │
+│   Database   │  │    Queue     │
+└──────────────┘  └──────────────┘
                             │
                             ▼
                     ┌──────────────┐
-                    │  PostgreSQL  │
-                    │   Database   │
+                    │   Worker     │
+                    │  (Celery)    │
                     └──────────────┘
 ```
+
+## Architecture Overview
+
+### API vs Worker Separation
+
+The system follows a **separation of concerns** pattern:
+
+- **Runner API (FastAPI)**: Handles HTTP requests, creates run records, enqueues jobs
+- **Worker Process (Celery)**: Consumes jobs from Redis queue and executes workflows asynchronously
+- **Redis Queue**: Acts as message broker, ensuring reliable job delivery and enabling horizontal scaling
+
+This separation provides:
+- **Non-blocking API**: API returns immediately after enqueueing, doesn't wait for execution
+- **Scalability**: Multiple workers can process jobs in parallel
+- **Reliability**: Jobs persist in Redis, survive worker restarts
+- **Observability**: Clear separation between API layer and execution layer
+
+### Why Redis Queue Exists
+
+Redis serves as the **job queue broker** for several reasons:
+
+1. **Asynchronous Execution**: Workflows can take seconds or minutes. API shouldn't block waiting.
+2. **Retry Logic**: Failed jobs can be automatically retried without API involvement
+3. **Rate Limiting**: Control how many workflows run concurrently
+4. **Priority Queues**: Future enhancement for high-priority workflows
+5. **Distributed Processing**: Multiple worker instances can consume from same queue
+
+### How SSE Delivers Events to UI
+
+**Server-Sent Events (SSE)** provides real-time updates:
+
+1. **Frontend** opens SSE connection: `GET /runs/{run_id}/events`
+2. **Runner API** maintains connection and streams events
+3. **Worker** emits events via `event_emitter` as workflow executes:
+   - `run_started`: Workflow execution begins
+   - `step_started`: A node starts executing
+   - `step_succeeded`: Node completes successfully
+   - `step_failed`: Node execution fails
+   - `run_finished`: Entire workflow completes
+4. **Frontend** receives events and updates UI in real-time:
+   - Run console shows streaming logs
+   - Timeline updates with step progress
+   - Canvas nodes show status badges
+
+**Event Flow:**
+```
+Worker → event_emitter.emit() → Runner API (in-memory) → SSE Stream → Frontend
+```
+
+**Replay Capability:**
+- All events are stored in database (`step_runs` table)
+- SSE endpoint sends existing step runs first (replay)
+- Then streams new events as they occur
+- UI can fetch `/runs/{run_id}/steps` to rebuild timeline even after run completes
 
 ## Data Model
 

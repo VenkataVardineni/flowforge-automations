@@ -57,11 +57,14 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      WORKFLOW_SERVICE_URL: http://workflow-service:8080
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      workflow-service:
+        condition: service_started
     restart: unless-stopped
     command: uvicorn app.main:app --host 0.0.0.0 --port 8081
 
@@ -75,11 +78,14 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      WORKFLOW_SERVICE_URL: http://workflow-service:8080
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      workflow-service:
+        condition: service_started
     restart: unless-stopped
     command: celery -A app.celery_app worker --loglevel=info
 

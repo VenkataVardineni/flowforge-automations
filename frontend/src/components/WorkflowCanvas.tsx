@@ -99,11 +99,32 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   // Generic node renderer that uses the schema definitions for display
   function AutomationNode({ data }: { data: any }) {
     const def = getNodeDefinition(data.type);
+    const status = data.status;
+    
+    const getStatusBadge = () => {
+      if (!status) return null;
+      const statusConfig: Record<string, { icon: string; class: string }> = {
+        queued: { icon: '⏸️', class: 'status-queued' },
+        running: { icon: '⏳', class: 'status-running' },
+        succeeded: { icon: '✅', class: 'status-succeeded' },
+        failed: { icon: '❌', class: 'status-failed' },
+        skipped: { icon: '⏭️', class: 'status-skipped' },
+      };
+      const config = statusConfig[status];
+      if (!config) return null;
+      return (
+        <span className={`node-status-badge ${config.class}`}>
+          {config.icon}
+        </span>
+      );
+    };
+    
     return (
       <div className="automation-node">
         <div className="automation-node-header">
           <span className="automation-node-icon">{def?.icon || '⬜'}</span>
           <span className="automation-node-title">{def?.label || data.label}</span>
+          {getStatusBadge()}
         </div>
         <div className="automation-node-body">
           {data.properties && Object.keys(data.properties).length > 0 ? (
@@ -132,7 +153,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   return (
     <div className="workflow-canvas" ref={reactFlowWrapper}>
       <ReactFlow
-        nodes={nodes as Node[]}
+        nodes={nodesWithStatus as Node[]}
         edges={edges as Edge[]}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
