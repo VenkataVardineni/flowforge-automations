@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { ReactFlowProvider } from 'react-flow-renderer';
 import WorkflowCanvas from './components/WorkflowCanvas';
 import NodePalette from './components/NodePalette';
@@ -6,6 +6,8 @@ import PropertyPanel from './components/PropertyPanel';
 import ThemeToggle from './components/ThemeToggle';
 import EmptyState from './components/EmptyState';
 import WorkflowsList, { Workflow } from './components/WorkflowsList';
+import RunConsole from './components/RunConsole';
+import RunTimeline, { StepRun } from './components/RunTimeline';
 import { getNodeDefinition, isTriggerNode } from './nodes/definitions';
 import './App.css';
 
@@ -35,6 +37,10 @@ function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [view, setView] = useState<'canvas' | 'list'>('list');
   const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null);
+  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
+  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
+  const [runSteps, setRunSteps] = useState<StepRun[]>([]);
+  const [nodeStatuses, setNodeStatuses] = useState<Record<string, string>>({});
 
   const onNodesChange = useCallback((changes: any) => {
     setNodes((nds) => {
@@ -272,6 +278,70 @@ function App() {
     }
   }, [nodes, edges]);
 
+  const runWorkflow = useCallback(async () => {
+    if (!currentWorkflowId) {
+      alert('Please save the workflow first before running');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:8081/runs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          workflow_id: currentWorkflowId,
+        }),
+      });
+
+      if (response.ok) {
+        const runData = await response.json();
+        setCurrentRunId(runData.id);
+        setIsConsoleOpen(true);
+        
+        // Fetch initial steps
+        fetchRunSteps(runData.id);
+      } else {
+        const text = await response.text();
+        alert(`Failed to start workflow run: ${text}`);
+      }
+    } catch (error) {
+      console.error('Error starting workflow run:', error);
+      alert('Error starting workflow run. Runner service may not be running.');
+    }
+  }, [currentWorkflowId]);
+
+  const fetchRunSteps = useCallback(async (runId: string) => {
+    try {
+      const response = await fetch(`http://localhost:8081/runs/${runId}/steps`);
+      if (response.ok) {
+        const steps = await response.json();
+        setRunSteps(steps);
+        
+        // Update node statuses
+        const statusMap: Record<string, string> = {};
+        steps.forEach((step: StepRun) => {
+          statusMap[step.node_id] = step.status;
+        });
+        setNodeStatuses(statusMap);
+      }
+    } catch (error) {
+      console.error('Error fetching run steps:', error);
+    }
+  }, []);
+
+  // Poll for step updates when a run is active
+  useEffect(() => {
+    if (!currentRunId) return;
+
+    const interval = setInterval(() => {
+      fetchRunSteps(currentRunId);
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(interval);
+  }, [currentRunId, fetchRunSteps]);
+
   const hasWorkflow = nodes.length > 0;
 
   return (
@@ -300,9 +370,14 @@ function App() {
                 Validate Workflow
               </button>
               {hasWorkflow && (
-                <button className="save-button" onClick={saveWorkflow}>
-                  Save Workflow
-                </button>
+                <>
+                  <button className="run-button" onClick={runWorkflow}>
+                    ▶ Run
+                  </button>
+                  <button className="save-button" onClick={saveWorkflow}>
+                    Save Workflow
+                  </button>
+                </>
               )}
             </>
           )}
@@ -326,15 +401,27 @@ function App() {
                   onEdgesChange={onEdgesChange}
                   onConnect={onConnect}
                   onNodeSelect={setSelectedNode}
+                  nodeStatuses={nodeStatuses}
                 />
                 <PropertyPanel
                   node={selectedNode}
                   onUpdateProperties={updateNodeProperties}
                 />
+                {currentRunId && runSteps.length > 0 && (
+                  <RunTimeline steps={runSteps} />
+                )}
               </>
             ) : (
               <EmptyState onCreateFirstWorkflow={() => addNode('trigger', 'Webhook Trigger')} />
             )}
+          )}
+          {isConsoleOpen && (
+            <RunConsole
+              runId={currentRunId}
+              isOpen={isConsoleOpen}
+              onClose={() => setIsConsoleOpen(false)}
+            />
+          )}
           </ReactFlowProvider>
         )}
       </div>

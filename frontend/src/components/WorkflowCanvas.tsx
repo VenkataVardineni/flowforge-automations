@@ -19,6 +19,7 @@ interface WorkflowCanvasProps {
   onEdgesChange: (changes: any) => void;
   onConnect: (connection: Connection) => void;
   onNodeSelect: (node: WorkflowNode | null) => void;
+  nodeStatuses?: Record<string, string>;
 }
 
 const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
@@ -28,6 +29,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   onEdgesChange,
   onConnect,
   onNodeSelect,
+  nodeStatuses = {},
 }) => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = React.useState<ReactFlowInstance | null>(null);
