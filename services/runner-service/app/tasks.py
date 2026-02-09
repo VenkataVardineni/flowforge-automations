@@ -123,3 +123,165 @@ async def _execute_workflow_async(run_id: str, db):
         
         raise
 
+async def execute_workflow_nodes(db, run_id: UUID, nodes: list, edges: list):
+    """
+    Execute workflow nodes in topological order.
+    Implements idempotency: uses deterministic step_run keys to prevent duplicates.
+    """
+    # Build graph structure
+    node_map = {node["id"]: node for node in nodes}
+    incoming_edges = {node_id: [] for node_id in node_map.keys()}
+    outgoing_edges = {node_id: [] for node_id in node_map.keys()}
+    
+    for edge in edges:
+        source = edge["source"]
+        target = edge["target"]
+        incoming_edges[target].append(source)
+        outgoing_edges[source].append(target)
+    
+    # Find trigger node (no incoming edges)
+    trigger_nodes = [node_id for node_id, deps in incoming_edges.items() if not deps]
+    if not trigger_nodes:
+        raise Exception("No trigger node found in workflow")
+    
+    # Track node outputs
+    node_outputs = {}
+    
+    # Execute nodes in topological order (BFS)
+    queue = trigger_nodes.copy()
+    executed = set()
+    
+    while queue:
+        node_id = queue.pop(0)
+        if node_id in executed:
+            continue
+        
+        node = node_map[node_id]
+        node_type = node.get("data", {}).get("type", "")
+        node_config = node.get("data", {}).get("properties", {})
+        
+        # Check if all dependencies are executed
+        deps = incoming_edges.get(node_id, [])
+        if any(dep not in executed for dep in deps):
+            # Not ready yet, skip for now
+            queue.append(node_id)
+            continue
+        
+        # Idempotency: Check if step_run already exists (for retries)
+        existing_step = db.query(StepRun).filter(
+            StepRun.run_id == run_id,
+            StepRun.node_id == node_id
+        ).first()
+        
+        if existing_step and existing_step.status == StepStatus.SUCCEEDED:
+            # Step already completed successfully, skip
+            logger.info(f"Node {node_id} already executed successfully, skipping")
+            node_outputs[node_id] = existing_step.output_json or {}
+            executed.add(node_id)
+            # Add dependent nodes to queue
+            for next_node_id in outgoing_edges.get(node_id, []):
+                if next_node_id not in executed and next_node_id not in queue:
+                    queue.append(next_node_id)
+            continue
+        
+        # Create or update step run record
+        if existing_step:
+            step_run = existing_step
+            step_run.status = StepStatus.QUEUED
+            step_run.input_json = None  # Will be set below
+        else:
+            step_run = StepRun(
+                run_id=run_id,
+                node_id=node_id,
+                status=StepStatus.QUEUED,
+                input_json=None
+            )
+            db.add(step_run)
+        
+        # Get input data (from previous nodes)
+        input_data = None
+        if deps:
+            # Merge outputs from all dependencies
+            input_data = {}
+            for dep_id in deps:
+                dep_output = node_outputs.get(dep_id)
+                if dep_output:
+                    if isinstance(input_data, dict) and isinstance(dep_output, dict):
+                        input_data.update(dep_output)
+                    else:
+                        input_data = dep_output
+        
+        step_run.input_json = input_data
+        db.commit()
+        db.refresh(step_run)
+        
+        # Emit step_started event
+        event_emitter.emit(str(run_id), "step_started", {
+            "step_id": str(step_run.id),
+            "node_id": node_id,
+            "node_type": node_type
+        })
+        
+        # Update step status to running
+        step_run.status = StepStatus.RUNNING
+        step_run.started_at = datetime.utcnow()
+        db.commit()
+        
+        try:
+            # Get executor for node type
+            executor = get_executor(node_type)
+            if not executor:
+                raise Exception(f"No executor found for node type: {node_type}")
+            
+            # Execute node
+            if asyncio.iscoroutinefunction(executor):
+                output_data = await executor(node_config, input_data)
+            else:
+                # Run sync executor in thread pool
+                loop = asyncio.get_event_loop()
+                output_data = await loop.run_in_executor(None, executor, node_config, input_data)
+            
+            # Update step run with output
+            step_run.status = StepStatus.SUCCEEDED
+            step_run.finished_at = datetime.utcnow()
+            step_run.output_json = output_data
+            db.commit()
+            
+            # Store output for next nodes
+            node_outputs[node_id] = output_data
+            
+            # Emit step_succeeded event
+            event_emitter.emit(str(run_id), "step_succeeded", {
+                "step_id": str(step_run.id),
+                "node_id": node_id,
+                "output": output_data
+            })
+            
+            logger.info(f"Node {node_id} ({node_type}) executed successfully")
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Error executing node {node_id}: {error_msg}", exc_info=True)
+            
+            # Update step run with error
+            step_run.status = StepStatus.FAILED
+            step_run.finished_at = datetime.utcnow()
+            step_run.error = error_msg
+            db.commit()
+            
+            # Emit step_failed event
+            event_emitter.emit(str(run_id), "step_failed", {
+                "step_id": str(step_run.id),
+                "node_id": node_id,
+                "error": error_msg
+            })
+            
+            # Stop workflow execution on error
+            raise
+        
+        executed.add(node_id)
+        
+        # Add dependent nodes to queue
+        for next_node_id in outgoing_edges.get(node_id, []):
+            if next_node_id not in executed and next_node_id not in queue:
+                queue.append(next_node_id)
