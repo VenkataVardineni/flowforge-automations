@@ -16,6 +16,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: flowforge-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   workflow-service:
     build:
       context: ../services/workflow-service
@@ -32,21 +45,43 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  runner-service:
+  runner-api:
     build:
       context: ../services/runner-service
       dockerfile: Dockerfile
-    container_name: flowforge-runner-service
+    container_name: flowforge-runner-api
     ports:
       - "8081:8081"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowforge
-      SPRING_DATASOURCE_USERNAME: flowforge
-      SPRING_DATASOURCE_PASSWORD: flowforge
+      DATABASE_URL: postgresql://flowforge:flowforge@postgres:5432/flowforge
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8081
+
+  runner-worker:
+    build:
+      context: ../services/runner-service
+      dockerfile: Dockerfile
+    container_name: flowforge-runner-worker
+    environment:
+      DATABASE_URL: postgresql://flowforge:flowforge@postgres:5432/flowforge
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: celery -A app.celery_app worker --loglevel=info
 
   frontend:
     build:
@@ -61,4 +96,5 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
 
