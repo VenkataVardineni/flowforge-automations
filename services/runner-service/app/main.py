@@ -1,13 +1,18 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, AsyncGenerator
 from app.database import get_db, engine, Base
 from app.models import Run, StepRun
 from app.schemas import CreateRunRequest, RunResponse, StepRunResponse
 from app.tasks import execute_workflow
+from app.events import event_emitter
 from uuid import UUID
+from datetime import datetime
 import logging
+import asyncio
+import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -106,4 +111,85 @@ async def get_step_run(
     if not step:
         raise HTTPException(status_code=404, detail="Step run not found")
     return step
+
+@app.get("/runs/{run_id}/events")
+async def stream_run_events(run_id: UUID, db: Session = Depends(get_db)):
+    """
+    Server-Sent Events (SSE) stream for run execution events.
+    Emits: run_started, step_started, step_succeeded, step_failed, run_finished
+    """
+    # Verify run exists
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    async def event_generator() -> AsyncGenerator[str, None]:
+        """Generate SSE events"""
+        queue = asyncio.Queue()
+        
+        def event_handler(event: dict):
+            """Callback to handle events"""
+            asyncio.run_coroutine_threadsafe(queue.put(event), loop)
+        
+        # Subscribe to events
+        event_emitter.subscribe(str(run_id), event_handler)
+        
+        try:
+            # Send initial run state
+            initial_event = {
+                "type": "run_state",
+                "data": {
+                    "run_id": str(run_id),
+                    "status": run.status.value,
+                    "created_at": run.created_at.isoformat() if run.created_at else None,
+                    "started_at": run.started_at.isoformat() if run.started_at else None,
+                    "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+                },
+                "timestamp": run.created_at.isoformat() if run.created_at else datetime.utcnow().isoformat()
+            }
+            yield event_emitter.format_sse(initial_event)
+            
+            # Send existing step runs (replay)
+            steps = db.query(StepRun).filter(StepRun.run_id == run_id).order_by(StepRun.started_at).all()
+            for step in steps:
+                step_event = {
+                    "type": f"step_{step.status.value}",
+                    "data": {
+                        "step_id": str(step.id),
+                        "node_id": step.node_id,
+                        "status": step.status.value,
+                        "started_at": step.started_at.isoformat() if step.started_at else None,
+                        "finished_at": step.finished_at.isoformat() if step.finished_at else None,
+                    },
+                    "timestamp": step.started_at.isoformat() if step.started_at else datetime.utcnow().isoformat()
+                }
+                yield event_emitter.format_sse(step_event)
+            
+            # Stream new events
+            while True:
+                try:
+                    # Wait for event with timeout to keep connection alive
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield event_emitter.format_sse(event)
+                    
+                    # If run is finished, close connection
+                    if event.get("type") == "run_finished":
+                        break
+                except asyncio.TimeoutError:
+                    # Send keepalive
+                    yield ": keepalive\n\n"
+                    
+        finally:
+            # Unsubscribe
+            event_emitter.unsubscribe(str(run_id), event_handler)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 

@@ -2,6 +2,7 @@ from celery import Task
 from app.celery_app import celery_app
 from app.database import SessionLocal
 from app.models import Run, StepRun, RunStatus, StepStatus
+from app.events import event_emitter
 from datetime import datetime
 from uuid import UUID
 import json
@@ -45,6 +46,12 @@ def execute_workflow(self, run_id: str):
         run.started_at = datetime.utcnow()
         db.commit()
         
+        # Emit run_started event
+        event_emitter.emit(str(run_id), "run_started", {
+            "run_id": str(run_id),
+            "started_at": run.started_at.isoformat()
+        })
+        
         # TODO: Fetch workflow graph from workflow-service
         # For now, this is a placeholder that will be implemented in Commit #4
         logger.info(f"Executing workflow for run {run_id}")
@@ -56,6 +63,13 @@ def execute_workflow(self, run_id: str):
         run.status = RunStatus.COMPLETED
         run.finished_at = datetime.utcnow()
         db.commit()
+        
+        # Emit run_finished event
+        event_emitter.emit(str(run_id), "run_finished", {
+            "run_id": str(run_id),
+            "status": "completed",
+            "finished_at": run.finished_at.isoformat()
+        })
         
         logger.info(f"Workflow execution completed for run {run_id}")
         
@@ -70,6 +84,14 @@ def execute_workflow(self, run_id: str):
             run.finished_at = datetime.utcnow()
             run.error = str(e)
             db.commit()
+            
+            # Emit run_finished event with error
+            event_emitter.emit(str(run_id), "run_finished", {
+                "run_id": str(run_id),
+                "status": "failed",
+                "error": str(e),
+                "finished_at": run.finished_at.isoformat()
+            })
         
         raise
 
