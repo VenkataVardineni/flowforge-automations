@@ -86,6 +86,18 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     onNodeSelect(null);
   }, [onNodeSelect]);
 
+  // Enhance nodes with status badges
+  const nodesWithStatus = nodes.map((node) => {
+    const status = nodeStatuses[node.id];
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        status,
+      },
+    };
+  });
+
   const nodeTypes = {
     webhookTrigger: AutomationNode,
     scheduleTrigger: AutomationNode,
