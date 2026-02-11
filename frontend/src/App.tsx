@@ -8,6 +8,10 @@ import EmptyState from './components/EmptyState';
 import WorkflowsList, { Workflow } from './components/WorkflowsList';
 import RunConsole from './components/RunConsole';
 import RunTimeline, { StepRun } from './components/RunTimeline';
+import Login from './components/Login';
+import Register from './components/Register';
+import OrgSwitcher from './components/OrgSwitcher';
+import TeamSettings from './components/TeamSettings';
 import { getNodeDefinition, isTriggerNode } from './nodes/definitions';
 import './App.css';
 
@@ -31,6 +35,16 @@ export interface WorkflowEdge {
 }
 
 function App() {
+  // Auth state
+  const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('authToken'));
+  const [userId, setUserId] = useState<string | null>(localStorage.getItem('userId'));
+  const [orgId, setOrgId] = useState<string | null>(localStorage.getItem('orgId'));
+  const [orgName, setOrgName] = useState<string | null>(localStorage.getItem('orgName'));
+  const [userRole, setUserRole] = useState<string | null>(localStorage.getItem('userRole'));
+  const [showAuth, setShowAuth] = useState<'login' | 'register' | null>(null);
+  const [showTeamSettings, setShowTeamSettings] = useState(false);
+
+  // Workflow state
   const [nodes, setNodes] = useState<WorkflowNode[]>([]);
   const [edges, setEdges] = useState<WorkflowEdge[]>([]);
   const [selectedNode, setSelectedNode] = useState<WorkflowNode | null>(null);
@@ -41,6 +55,45 @@ function App() {
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
   const [runSteps, setRunSteps] = useState<StepRun[]>([]);
   const [nodeStatuses, setNodeStatuses] = useState<Record<string, string>>({});
+
+  // Check if user needs to authenticate
+  useEffect(() => {
+    if (!authToken) {
+      setShowAuth('login');
+    }
+  }, [authToken]);
+
+  const handleLogin = (token: string, uid: string, oid: string, role: string) => {
+    setAuthToken(token);
+    setUserId(uid);
+    setOrgId(oid);
+    setUserRole(role);
+    setOrgName('My Organization'); // Would come from API
+    setShowAuth(null);
+    localStorage.setItem('authToken', token);
+    localStorage.setItem('userId', uid);
+    localStorage.setItem('orgId', oid);
+    localStorage.setItem('userRole', role);
+    localStorage.setItem('orgName', 'My Organization');
+  };
+
+  const handleRegister = (token: string, uid: string, oid: string, role: string) => {
+    handleLogin(token, uid, oid, role);
+  };
+
+  const handleLogout = () => {
+    setAuthToken(null);
+    setUserId(null);
+    setOrgId(null);
+    setOrgName(null);
+    setUserRole(null);
+    setShowAuth('login');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('orgId');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('orgName');
+  };
 
   const onNodesChange = useCallback((changes: any) => {
     setNodes((nds) => {
@@ -121,6 +174,11 @@ function App() {
   }, [selectedNode]);
 
   const saveWorkflow = useCallback(async () => {
+    if (!authToken || !orgId) {
+      alert('Please login first');
+      return;
+    }
+
     const workflow = {
       workspaceId: '00000000-0000-0000-0000-000000000000', // Default workspace for MVP
       name: `Workflow ${new Date().toLocaleString()}`,
@@ -137,6 +195,9 @@ function App() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+            'X-Org-Id': orgId,
+            'X-User-Role': userRole || '',
           },
           body: JSON.stringify({
             workflowId: currentWorkflowId,
@@ -149,6 +210,9 @@ function App() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+            'X-Org-Id': orgId,
+            'X-User-Role': userRole || '',
           },
           body: JSON.stringify(workflow),
         });
@@ -175,8 +239,14 @@ function App() {
   }, [nodes, edges, currentWorkflowId]);
 
   const loadWorkflow = useCallback(async (workflow: Workflow) => {
+    if (!authToken || !orgId) return;
     try {
-      const response = await fetch(`http://localhost:8080/api/workflows/${workflow.id}`);
+      const response = await fetch(`http://localhost:8080/api/workflows/${workflow.id}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'X-Org-Id': orgId,
+        },
+      });
       if (response.ok) {
         const data = await response.json();
         if (data.graph) {
@@ -283,12 +353,19 @@ function App() {
       alert('Please save the workflow first before running');
       return;
     }
+    if (!authToken || !orgId) {
+      alert('Please login first');
+      return;
+    }
 
     try {
-      const response = await fetch('http://localhost:8081/runs', {
+      const response = await fetch('http://localhost:8080/api/runs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+          'X-Org-Id': orgId,
+          'X-User-Role': userRole || '',
         },
         body: JSON.stringify({
           workflow_id: currentWorkflowId,
@@ -313,8 +390,14 @@ function App() {
   }, [currentWorkflowId]);
 
   const fetchRunSteps = useCallback(async (runId: string) => {
+    if (!authToken || !orgId) return;
     try {
-      const response = await fetch(`http://localhost:8081/runs/${runId}/steps`);
+      const response = await fetch(`http://localhost:8080/api/runs/${runId}/steps`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'X-Org-Id': orgId,
+        },
+      });
       if (response.ok) {
         const steps = await response.json();
         setRunSteps(steps);
@@ -344,10 +427,29 @@ function App() {
 
   const hasWorkflow = nodes.length > 0;
 
+  // Show auth screens if not authenticated
+  if (showAuth === 'login') {
+    return <Login onLogin={handleLogin} onSwitchToRegister={() => setShowAuth('register')} />;
+  }
+  if (showAuth === 'register') {
+    return <Register onRegister={handleRegister} onSwitchToLogin={() => setShowAuth('login')} />;
+  }
+
   return (
     <div className={`app ${isDarkMode ? 'dark' : 'light'}`}>
       <div className="app-header">
-        <h1 className="app-title">FlowForge Automations</h1>
+        <div className="header-left">
+          <h1 className="app-title">FlowForge Automations</h1>
+          <OrgSwitcher
+            currentOrgId={orgId}
+            currentOrgName={orgName}
+            onOrgChange={(newOrgId) => {
+              setOrgId(newOrgId);
+              localStorage.setItem('orgId', newOrgId);
+            }}
+            onLogout={handleLogout}
+          />
+        </div>
         <div className="header-actions">
           <div className="view-toggle">
             <button
@@ -363,6 +465,11 @@ function App() {
               Editor
             </button>
           </div>
+          {orgId && (
+            <button className="secondary-button" onClick={() => setShowTeamSettings(true)}>
+              Team
+            </button>
+          )}
           <ThemeToggle isDarkMode={isDarkMode} onToggle={setIsDarkMode} />
           {view === 'canvas' && (
             <>
@@ -388,6 +495,8 @@ function App() {
           <WorkflowsList
             onSelectWorkflow={loadWorkflow}
             onCreateNew={createNewWorkflow}
+            authToken={authToken}
+            orgId={orgId}
           />
         ) : (
           <ReactFlowProvider>
@@ -425,6 +534,14 @@ function App() {
           </ReactFlowProvider>
         )}
       </div>
+      {showTeamSettings && orgId && authToken && userRole && (
+        <TeamSettings
+          orgId={orgId}
+          userRole={userRole}
+          token={authToken}
+          onClose={() => setShowTeamSettings(false)}
+        />
+      )}
     </div>
   );
 }

@@ -26,3 +26,4 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onCreateFirstWorkflow }) => {
 export default EmptyState;
 
 
+

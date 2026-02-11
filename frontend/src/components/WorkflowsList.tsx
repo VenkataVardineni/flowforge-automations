@@ -18,6 +18,8 @@ export interface Workflow {
 interface WorkflowsListProps {
   onSelectWorkflow: (workflow: Workflow) => void;
   onCreateNew: () => void;
+  authToken?: string | null;
+  orgId?: string | null;
 }
 
 const WorkflowsList: React.FC<WorkflowsListProps> = ({ onSelectWorkflow, onCreateNew }) => {
@@ -168,5 +170,6 @@ const WorkflowsList: React.FC<WorkflowsListProps> = ({ onSelectWorkflow, onCreat
 };
 
 export default WorkflowsList;
+
 
 
