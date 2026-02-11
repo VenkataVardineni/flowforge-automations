@@ -20,17 +20,20 @@ import java.util.UUID;
 public class WorkflowController {
     private final WorkflowService workflowService;
     private final AuthorizationService authorizationService;
+    private final AuditService auditService;
 
     @Autowired
-    public WorkflowController(WorkflowService workflowService, AuthorizationService authorizationService) {
+    public WorkflowController(WorkflowService workflowService, AuthorizationService authorizationService, AuditService auditService) {
         this.workflowService = workflowService;
         this.authorizationService = authorizationService;
+        this.auditService = auditService;
     }
 
     @PostMapping
     public ResponseEntity<WorkflowResponse> createWorkflow(
             @Valid @RequestBody CreateWorkflowRequest request,
             @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
             @RequestHeader(value = "X-User-Role", required = false) String role,
             HttpServletRequest httpRequest) {
         UUID orgId = orgIdHeader != null ? UUID.fromString(orgIdHeader) : null;
@@ -41,6 +44,20 @@ public class WorkflowController {
         }
         
         WorkflowResponse response = workflowService.createWorkflow(request, orgId);
+        
+        // Audit log
+        if (orgId != null && userId != null) {
+            auditService.logAction(
+                orgId,
+                UUID.fromString(userId),
+                "workflow.created",
+                "workflow",
+                response.getId(),
+                java.util.Map.of("name", response.getName()),
+                httpRequest
+            );
+        }
+        
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -56,7 +73,9 @@ public class WorkflowController {
             @PathVariable UUID id,
             @Valid @RequestBody SaveVersionRequest request,
             @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader,
-            @RequestHeader(value = "X-User-Role", required = false) String role) {
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            HttpServletRequest httpRequest) {
         UUID orgId = orgIdHeader != null ? UUID.fromString(orgIdHeader) : null;
         
         // Authorization check
@@ -66,6 +85,20 @@ public class WorkflowController {
         
         request.setWorkflowId(id);
         WorkflowResponse response = workflowService.saveVersion(request);
+        
+        // Audit log
+        if (orgId != null && userId != null) {
+            auditService.logAction(
+                orgId,
+                UUID.fromString(userId),
+                "workflow.updated",
+                "workflow",
+                id,
+                java.util.Map.of("version", response.getVersion()),
+                httpRequest
+            );
+        }
+        
         return ResponseEntity.ok(response);
     }
 
