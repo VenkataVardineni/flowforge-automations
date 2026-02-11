@@ -19,17 +19,27 @@ import java.util.UUID;
 @CrossOrigin(origins = "*")
 public class WorkflowController {
     private final WorkflowService workflowService;
+    private final AuthorizationService authorizationService;
 
     @Autowired
-    public WorkflowController(WorkflowService workflowService) {
+    public WorkflowController(WorkflowService workflowService, AuthorizationService authorizationService) {
         this.workflowService = workflowService;
+        this.authorizationService = authorizationService;
     }
 
     @PostMapping
     public ResponseEntity<WorkflowResponse> createWorkflow(
             @Valid @RequestBody CreateWorkflowRequest request,
-            @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader) {
+            @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader,
+            @RequestHeader(value = "X-User-Role", required = false) String role,
+            HttpServletRequest httpRequest) {
         UUID orgId = orgIdHeader != null ? UUID.fromString(orgIdHeader) : null;
+        
+        // Authorization check
+        if (!authorizationService.canCreateWorkflow(orgId, role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        
         WorkflowResponse response = workflowService.createWorkflow(request, orgId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -44,7 +54,16 @@ public class WorkflowController {
     @PostMapping("/{id}/versions")
     public ResponseEntity<WorkflowResponse> saveVersion(
             @PathVariable UUID id,
-            @Valid @RequestBody SaveVersionRequest request) {
+            @Valid @RequestBody SaveVersionRequest request,
+            @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+        UUID orgId = orgIdHeader != null ? UUID.fromString(orgIdHeader) : null;
+        
+        // Authorization check
+        if (!authorizationService.canUpdateWorkflow(orgId, role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        
         request.setWorkflowId(id);
         WorkflowResponse response = workflowService.saveVersion(request);
         return ResponseEntity.ok(response);

@@ -42,12 +42,17 @@ async def create_run(
     request: CreateRunRequest,
     http_request: Request,
     x_org_id: Optional[str] = Header(None, alias="X-Org-Id"),
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
     db: Session = Depends(lambda: next(get_db(http_request)))
 ):
     """
     Create a new workflow run and enqueue it for execution.
     Returns immediately with the run record.
     """
+    # Authorization: All roles can run workflows
+    if not x_user_role or x_user_role not in ["OWNER", "ADMIN", "MEMBER"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions to create runs")
+    
     # Create run record
     org_id = UUID(x_org_id) if x_org_id else None
     run = Run(
