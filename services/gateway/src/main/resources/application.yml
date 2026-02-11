@@ -1,0 +1,48 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: flowforge-gateway
+
+  main:
+    web-application-type: reactive
+
+  cloud:
+    gateway:
+      default-filters:
+        # Propagate Authorization header downstream
+        - PreserveHostHeader
+      routes:
+        - id: workflow-service
+          uri: http://workflow-service:8080
+          predicates:
+            - Path=/api/workflows/**, /api/workflow/**, /api/audit/**
+          filters:
+            - StripPrefix=1
+
+        - id: runner-service
+          uri: http://runner-api:8081
+          predicates:
+            - Path=/api/runs/**, /api/run/**, /api/events/**
+          filters:
+            - StripPrefix=1
+
+        - id: auth-service
+          uri: http://auth-service:8090
+          predicates:
+            - Path=/auth/**, /api/auth/**
+
+        # Health / public endpoints can be routed directly or served by gateway
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:changeme-super-secret}
+
+
