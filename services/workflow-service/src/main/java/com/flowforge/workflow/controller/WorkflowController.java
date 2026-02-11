@@ -26,8 +26,11 @@ public class WorkflowController {
     }
 
     @PostMapping
-    public ResponseEntity<WorkflowResponse> createWorkflow(@Valid @RequestBody CreateWorkflowRequest request) {
-        WorkflowResponse response = workflowService.createWorkflow(request);
+    public ResponseEntity<WorkflowResponse> createWorkflow(
+            @Valid @RequestBody CreateWorkflowRequest request,
+            @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader) {
+        UUID orgId = orgIdHeader != null ? UUID.fromString(orgIdHeader) : null;
+        WorkflowResponse response = workflowService.createWorkflow(request, orgId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

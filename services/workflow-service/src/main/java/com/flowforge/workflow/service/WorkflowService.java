@@ -36,16 +36,17 @@ public class WorkflowService {
     }
 
     @Transactional
-    public WorkflowResponse createWorkflow(CreateWorkflowRequest request) {
+    public WorkflowResponse createWorkflow(CreateWorkflowRequest request, UUID orgId) {
         Workflow workflow = new Workflow();
         workflow.setWorkspaceId(request.getWorkspaceId());
+        workflow.setOrgId(orgId);
         workflow.setName(request.getName());
         workflow.setStatus(Workflow.WorkflowStatus.DRAFT);
         workflow.setVersion(1);
         workflow = workflowRepository.save(workflow);
 
         if (request.getGraph() != null) {
-            saveWorkflowVersion(workflow.getId(), 1, request.getGraph());
+            saveWorkflowVersion(workflow.getId(), 1, request.getGraph(), orgId);
         }
 
         return getWorkflowResponse(workflow);
@@ -65,7 +66,7 @@ public class WorkflowService {
         workflow.setVersion(newVersion);
         workflow = workflowRepository.save(workflow);
 
-        saveWorkflowVersion(workflow.getId(), newVersion, request.getGraph());
+        saveWorkflowVersion(workflow.getId(), newVersion, request.getGraph(), workflow.getOrgId());
 
         return getWorkflowResponse(workflow);
     }
@@ -81,11 +82,12 @@ public class WorkflowService {
                 .collect(Collectors.toList());
     }
 
-    private void saveWorkflowVersion(UUID workflowId, Integer version, Map<String, Object> graph) {
+    private void saveWorkflowVersion(UUID workflowId, Integer version, Map<String, Object> graph, UUID orgId) {
         try {
             String graphJson = objectMapper.writeValueAsString(graph);
             WorkflowVersion workflowVersion = new WorkflowVersion();
             workflowVersion.setWorkflowId(workflowId);
+            workflowVersion.setOrgId(orgId);
             workflowVersion.setVersion(version);
             workflowVersion.setGraphJson(graphJson);
             workflowVersionRepository.save(workflowVersion);

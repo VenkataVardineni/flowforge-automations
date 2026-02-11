@@ -26,3 +26,4 @@ celery_app.conf.update(
     task_soft_time_limit=240,  # 4 minutes soft limit
 )
 
+

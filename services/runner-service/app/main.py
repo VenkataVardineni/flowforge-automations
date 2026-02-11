@@ -1,10 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List, AsyncGenerator
+from typing import List, AsyncGenerator, Optional
 from app.database import get_db, engine, Base
-from app.models import Run, StepRun
+from app.models import Run, StepRun, RunStatus
 from app.schemas import CreateRunRequest, RunResponse, StepRunResponse
 from app.tasks import execute_workflow
 from app.events import event_emitter
@@ -13,6 +13,7 @@ from datetime import datetime
 import logging
 import asyncio
 import json
+from sqlalchemy import text
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
@@ -38,15 +40,19 @@ async def health_check():
 @app.post("/runs", response_model=RunResponse, status_code=201)
 async def create_run(
     request: CreateRunRequest,
-    db: Session = Depends(get_db)
+    http_request: Request,
+    x_org_id: Optional[str] = Header(None, alias="X-Org-Id"),
+    db: Session = Depends(lambda: next(get_db(http_request)))
 ):
     """
     Create a new workflow run and enqueue it for execution.
     Returns immediately with the run record.
     """
     # Create run record
+    org_id = UUID(x_org_id) if x_org_id else None
     run = Run(
         workflow_id=request.workflow_id,
+        org_id=org_id,
         status=RunStatus.PENDING
     )
     db.add(run)
@@ -63,7 +69,8 @@ async def create_run(
 @app.get("/runs/{run_id}", response_model=RunResponse)
 async def get_run(
     run_id: UUID,
-    db: Session = Depends(get_db)
+    http_request: Request,
+    db: Session = Depends(lambda: next(get_db(http_request)))
 ):
     """Get run details by ID"""
     run = db.query(Run).filter(Run.id == run_id).first()
@@ -73,9 +80,10 @@ async def get_run(
 
 @app.get("/runs", response_model=List[RunResponse])
 async def list_runs(
-    workflow_id: UUID = None,
+    workflow_id: Optional[UUID] = None,
     limit: int = 100,
-    db: Session = Depends(get_db)
+    http_request: Request = None,
+    db: Session = Depends(lambda: next(get_db(http_request)) if http_request else next(get_db()))
 ):
     """List runs, optionally filtered by workflow_id"""
     query = db.query(Run)
@@ -87,7 +95,8 @@ async def list_runs(
 @app.get("/runs/{run_id}/steps", response_model=List[StepRunResponse])
 async def get_run_steps(
     run_id: UUID,
-    db: Session = Depends(get_db)
+    http_request: Request,
+    db: Session = Depends(lambda: next(get_db(http_request)))
 ):
     """Get all step runs for a given run"""
     run = db.query(Run).filter(Run.id == run_id).first()
@@ -101,7 +110,8 @@ async def get_run_steps(
 async def get_step_run(
     run_id: UUID,
     step_id: UUID,
-    db: Session = Depends(get_db)
+    http_request: Request,
+    db: Session = Depends(lambda: next(get_db(http_request)))
 ):
     """Get a specific step run"""
     step = db.query(StepRun).filter(
@@ -113,7 +123,7 @@ async def get_step_run(
     return step
 
 @app.get("/runs/{run_id}/events")
-async def stream_run_events(run_id: UUID, db: Session = Depends(get_db)):
+async def stream_run_events(run_id: UUID, http_request: Request, db: Session = Depends(lambda: next(get_db(http_request)))):
     """
     Server-Sent Events (SSE) stream for run execution events.
     Emits: run_started, step_started, step_succeeded, step_failed, run_finished

@@ -45,3 +45,4 @@ class EventEmitter:
 # Global event emitter instance
 event_emitter = EventEmitter()
 
+

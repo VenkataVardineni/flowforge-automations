@@ -14,6 +14,9 @@ public class WorkflowVersion {
     @Column(name = "workflow_id", nullable = false)
     private UUID workflowId;
 
+    @Column(name = "org_id")
+    private UUID orgId;
+
     @Column(nullable = false)
     private Integer version;
 
@@ -42,6 +45,14 @@ public class WorkflowVersion {
 
     public void setWorkflowId(UUID workflowId) {
         this.workflowId = workflowId;
+    }
+
+    public UUID getOrgId() {
+        return orgId;
+    }
+
+    public void setOrgId(UUID orgId) {
+        this.orgId = orgId;
     }
 
     public Integer getVersion() {

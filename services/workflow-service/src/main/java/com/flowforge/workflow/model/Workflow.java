@@ -14,6 +14,9 @@ public class Workflow {
     @Column(name = "workspace_id", nullable = false)
     private UUID workspaceId;
 
+    @Column(name = "org_id")
+    private UUID orgId;
+
     @Column(nullable = false)
     private String name;
 
@@ -60,6 +63,14 @@ public class Workflow {
         this.workspaceId = workspaceId;
     }
 
+    public UUID getOrgId() {
+        return orgId;
+    }
+
+    public void setOrgId(UUID orgId) {
+        this.orgId = orgId;
+    }
+
     public String getName() {
         return name;
     }
@@ -104,5 +115,6 @@ public class Workflow {
         DRAFT, ACTIVE, ARCHIVED
     }
 }
+
 
 

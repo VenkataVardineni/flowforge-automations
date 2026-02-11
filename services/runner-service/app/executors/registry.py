@@ -25,3 +25,4 @@ def register_executor(node_type: str, executor: Callable):
     EXECUTORS[node_type] = executor
     logger.info(f"Registered executor for node type: {node_type}")
 
+

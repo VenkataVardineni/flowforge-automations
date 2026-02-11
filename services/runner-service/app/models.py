@@ -25,6 +25,7 @@ class Run(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     workflow_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    org_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     status = Column(SQLEnum(RunStatus), nullable=False, default=RunStatus.PENDING, index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     started_at = Column(DateTime, nullable=True)
@@ -40,6 +41,7 @@ class StepRun(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     run_id = Column(UUID(as_uuid=True), ForeignKey("runs.id"), nullable=False, index=True)
+    org_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     node_id = Column(String, nullable=False, index=True)
     status = Column(SQLEnum(StepStatus), nullable=False, default=StepStatus.QUEUED, index=True)
     started_at = Column(DateTime, nullable=True)
@@ -50,4 +52,5 @@ class StepRun(Base):
 
     # Relationship to run
     run = relationship("Run", back_populates="step_runs")
+
 

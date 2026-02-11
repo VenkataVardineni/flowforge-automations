@@ -108,6 +108,8 @@ services:
     environment:
       JWT_SECRET: ${JWT_SECRET:-changeme-super-secret}
     depends_on:
+      auth-service:
+        condition: service_started
       workflow-service:
         condition: service_started
       runner-api:

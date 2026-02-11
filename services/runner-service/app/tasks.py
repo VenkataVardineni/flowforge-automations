@@ -184,6 +184,10 @@ async def execute_workflow_nodes(db, run_id: UUID, nodes: list, edges: list):
                     queue.append(next_node_id)
             continue
         
+        # Get org_id from run
+        run_record = db.query(Run).filter(Run.id == run_id).first()
+        org_id = run_record.org_id if run_record else None
+        
         # Create or update step run record
         if existing_step:
             step_run = existing_step
@@ -192,6 +196,7 @@ async def execute_workflow_nodes(db, run_id: UUID, nodes: list, edges: list):
         else:
             step_run = StepRun(
                 run_id=run_id,
+                org_id=org_id,
                 node_id=node_id,
                 status=StepStatus.QUEUED,
                 input_json=None
