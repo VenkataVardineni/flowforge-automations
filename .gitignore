@@ -37,5 +37,11 @@ tmp/
 temp/
 *.tmp
 
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+flowforge_runner.db
+
 
 
