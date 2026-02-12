@@ -9,7 +9,9 @@ Before you begin, ensure you have the following installed on your system:
 - **Node.js** (v18 or higher) and npm
 - **Java** (JDK 17 or higher)
 - **Maven** (v3.8 or higher)
-- **PostgreSQL** (optional - H2 in-memory database is used by default for development)
+- **Python** (v3.10 or higher) and pip
+- **PostgreSQL** (optional - H2/SQLite used by default for development)
+- **Redis** (optional - for background job processing with Celery)
 
 ### Verify Installations
 
@@ -25,6 +27,12 @@ java -version  # Should be Java 17 or higher
 
 # Check Maven version
 mvn --version  # Should be Maven 3.8 or higher
+
+# Check Python version
+python3 --version  # Should be Python 3.10 or higher
+
+# Check pip version
+pip3 --version
 ```
 
 ## Step 1: Clone the Repository
@@ -34,59 +42,106 @@ git clone <repository-url>
 cd "Flow Forge Automations"
 ```
 
-## Step 2: Backend Setup
+## Step 2: Backend Services Setup
 
-### 2.1 Build the Workflow Service
+FlowForge uses a microservices architecture with multiple backend services. You'll need to start each service separately.
 
-Navigate to the workflow service directory and build the project:
+### 2.1 API Gateway (Port 8080)
+
+The API Gateway is the single entry point for all API requests.
 
 ```bash
+cd services/gateway
+mvn clean package -DskipTests
+mvn spring-boot:run
+```
+
+The gateway will start on port **8080**. Keep this terminal window open.
+
+**Configuration:**
+- Default port: 8080
+- JWT secret: `changeme-super-secret-key-for-jwt-signing` (change in production!)
+- Routes requests to:
+  - `/auth/**` → Auth Service (port 8090)
+  - `/api/workflows/**` → Workflow Service (port 8082)
+  - `/api/runs/**` → Runner Service (port 8081)
+
+### 2.2 Auth Service (Port 8090)
+
+Handles user authentication and organization management.
+
+```bash
+# In a new terminal
+cd services/auth-service
+mvn clean package -DskipTests
+mvn spring-boot:run
+```
+
+The auth service will start on port **8090**.
+
+**Configuration:**
+- Default port: 8090
+- Database: H2 in-memory (development) or PostgreSQL (production)
+- JWT secret: Must match gateway configuration
+
+### 2.3 Workflow Service (Port 8082)
+
+Handles workflow CRUD operations.
+
+```bash
+# In a new terminal
 cd services/workflow-service
 mvn clean package -DskipTests
+mvn spring-boot:run
 ```
 
-This will:
-- Download all Maven dependencies
-- Compile the Java code
-- Package the application into a JAR file
+The workflow service will start on port **8082**.
 
-The JAR file will be created at: `target/workflow-service-0.1.0.jar`
+**Configuration:**
+- Default port: 8082
+- Database: H2 in-memory (development) or PostgreSQL (production)
+- CORS: Handled by gateway (disabled in service)
 
-### 2.2 Configure Database (Optional)
+### 2.4 Runner Service (Port 8081)
 
-By default, the application uses H2 in-memory database, which requires no setup. If you want to use PostgreSQL:
-
-1. **Install PostgreSQL** (if not already installed)
-2. **Create the database:**
-   ```bash
-   createdb flowforge
-   ```
-3. **Update `application.yml`:**
-   ```yaml
-   spring:
-     datasource:
-       url: jdbc:postgresql://localhost:5432/flowforge
-       username: postgres
-       password: postgres
-       driver-class-name: org.postgresql.Driver
-     jpa:
-       database-platform: org.hibernate.dialect.PostgreSQLDialect
-   ```
-
-### 2.3 Start the Workflow Service
-
-Run the service:
+Executes workflows and provides real-time execution updates.
 
 ```bash
-java -jar target/workflow-service-0.1.0.jar
+# In a new terminal
+cd services/runner-service
+
+# Create virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start the service
+uvicorn app.main:app --host 0.0.0.0 --port 8081
 ```
 
-The service will start on port **8080**. You should see:
-```
-Started WorkflowServiceApplication in X.XXX seconds
-```
+The runner service will start on port **8081**.
 
-Keep this terminal window open.
+**Configuration:**
+- Default port: 8081
+- Database: SQLite (development) or PostgreSQL (production)
+- Redis: Optional, for Celery background jobs
+- Environment variables:
+  - `DATABASE_URL`: Database connection string (default: `sqlite:///./flowforge_runner.db`)
+  - `REDIS_URL`: Redis connection string (optional)
+  - `WORKFLOW_SERVICE_URL`: URL of workflow service (default: `http://workflow-service:8080`)
+
+**Optional: Start Celery Worker (for background job processing)**
+
+If you have Redis running, you can start the Celery worker:
+
+```bash
+# In a new terminal
+cd services/runner-service
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+celery -A app.celery_app worker --loglevel=info
+```
 
 ## Step 3: Frontend Setup
 
@@ -105,7 +160,17 @@ This will install all required npm packages including:
 - TypeScript
 - And other dependencies
 
-### 3.2 Start the Frontend Development Server
+### 3.2 Configure API URL
+
+The frontend needs to know where the API Gateway is running. By default, it's configured to use `http://localhost:8080`.
+
+If your gateway is running on a different port, create a `.env` file in the `frontend` directory:
+
+```bash
+echo "REACT_APP_API_URL=http://localhost:8080" > frontend/.env
+```
+
+### 3.3 Start the Frontend Development Server
 
 ```bash
 npm start
@@ -115,65 +180,149 @@ The frontend will start on port **3000** and automatically open in your browser 
 
 ## Step 4: Verify Installation
 
-### 4.1 Check Backend Service
+### 4.1 Check All Services
 
-Open a browser or use curl to verify the backend is running:
+Verify all services are running:
 
 ```bash
-curl http://localhost:8080/api/workflows
-```
+# Check Gateway (port 8080)
+curl http://localhost:8080/actuator/health
 
-You should receive an empty array `[]` if no workflows exist, or a JSON array of workflows.
+# Check Auth Service (port 8090)
+curl http://localhost:8090/health
+
+# Check Workflow Service (port 8082)
+curl http://localhost:8082/actuator/health
+
+# Check Runner Service (port 8081)
+curl http://localhost:8081/health
+```
 
 ### 4.2 Check Frontend
 
 Visit `http://localhost:3000` in your browser. You should see:
-- The FlowForge Automations header
-- "My Workflows" and "Editor" view toggle buttons
+- The FlowForge Automations login page
+- After logging in, the workflows list view
 - Theme toggle button
-- The workflows list view (empty if no workflows exist)
+- Organization switcher
 
-## Step 5: Create Your First Workflow
+## Step 5: Create Your First Account
+
+1. **Register**: Click "Register" on the login page
+2. **Fill in details**:
+   - Email: Your email address
+   - Password: Your password
+   - Organization Name: Your organization name
+3. **Submit**: You'll be automatically logged in and redirected to the workflows list
+
+## Step 6: Create Your First Workflow
 
 1. **Switch to Editor View**: Click the "Editor" button in the header
 2. **Add a Node**: Drag a node from the left sidebar (e.g., "Webhook Trigger") onto the canvas
-3. **Add More Nodes**: Add additional nodes like "HTTP Request" or "Email"
+3. **Add More Nodes**: Add additional nodes like "HTTP Request" or "Transform"
 4. **Connect Nodes**: Click and drag from a node's output handle to another node's input handle
 5. **Configure Nodes**: Click on a node to configure its properties in the right panel
 6. **Save Workflow**: Click the "Save Workflow" button in the header
+7. **Run Workflow**: Click the "Run Workflow" button to execute it
 
-## Step 6: View Saved Workflows
+## Step 7: View Execution
 
-1. **Switch to List View**: Click the "My Workflows" button in the header
-2. **View Workflows**: You'll see all your saved workflows in a grid layout
-3. **Open Workflow**: Click on any workflow card to open it in the editor
-4. **Create New**: Click "Create New Workflow" to start a fresh workflow
+1. **Open Run Console**: Click the "Run Console" button after starting a workflow run
+2. **View Timeline**: See the execution timeline with step-by-step status
+3. **Monitor Status**: Watch real-time updates as nodes execute
+4. **View Logs**: Check execution logs for each step
 
 ## Configuration Options
 
 ### Environment Variables
 
-You can customize the application using environment variables:
+**Gateway:**
+- `JWT_SECRET`: Secret key for JWT signing (default: `changeme-super-secret-key-for-jwt-signing`)
+
+**Auth Service:**
+- `JWT_SECRET`: Must match gateway secret
+- `SPRING_DATASOURCE_URL`: Database connection URL (default: H2 in-memory)
+- `SPRING_DATASOURCE_USERNAME`: Database username
+- `SPRING_DATASOURCE_PASSWORD`: Database password
 
 **Workflow Service:**
-- `POSTGRES_USER`: Database username (default: `sa` for H2)
-- `POSTGRES_PASSWORD`: Database password (default: empty for H2)
 - `DATABASE_URL`: Database connection URL (default: H2 in-memory)
-- `DATABASE_DRIVER`: Database driver class (default: `org.h2.Driver`)
-- `DATABASE_PLATFORM`: Hibernate dialect (default: `org.hibernate.dialect.H2Dialect`)
+- `POSTGRES_USER`: Database username
+- `POSTGRES_PASSWORD`: Database password
 
-**Example:**
-```bash
-POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres java -jar target/workflow-service-0.1.0.jar
-```
+**Runner Service:**
+- `DATABASE_URL`: Database connection URL (default: SQLite)
+- `REDIS_URL`: Redis connection string (optional)
+- `WORKFLOW_SERVICE_URL`: Workflow service URL
 
-### Application Configuration
+**Frontend:**
+- `REACT_APP_API_URL`: API Gateway URL (default: `http://localhost:8080`)
 
-Edit `services/workflow-service/src/main/resources/application.yml` to customize:
-- Server port (default: 8080)
-- Database connection settings
-- Logging levels
-- CORS configuration
+### Using PostgreSQL (Production)
+
+To use PostgreSQL instead of H2/SQLite:
+
+1. **Install PostgreSQL** (if not already installed)
+2. **Create the database:**
+   ```bash
+   createdb flowforge
+   ```
+3. **Update service configurations:**
+
+   **Auth Service** (`services/auth-service/src/main/resources/application.yml`):
+   ```yaml
+   spring:
+     datasource:
+       url: jdbc:postgresql://localhost:5432/flowforge
+       username: postgres
+       password: postgres
+       driver-class-name: org.postgresql.Driver
+     jpa:
+       database-platform: org.hibernate.dialect.PostgreSQLDialect
+   ```
+
+   **Workflow Service** (`services/workflow-service/src/main/resources/application.yml`):
+   ```yaml
+   spring:
+     datasource:
+       url: jdbc:postgresql://localhost:5432/flowforge
+       username: postgres
+       password: postgres
+       driver-class-name: org.postgresql.Driver
+     jpa:
+       database-platform: org.hibernate.dialect.PostgreSQLDialect
+   ```
+
+   **Runner Service** (set environment variable):
+   ```bash
+   export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/flowforge"
+   ```
+
+4. **Run RLS migrations** (if using PostgreSQL):
+   ```bash
+   psql flowforge < infra/db/migrations/001_add_org_id_and_rls.sql
+   psql flowforge < infra/db/migrations/002_add_audit_log.sql
+   ```
+
+### Using Redis (For Background Jobs)
+
+1. **Install Redis** (if not already installed)
+2. **Start Redis:**
+   ```bash
+   redis-server
+   ```
+3. **Update Runner Service environment:**
+   ```bash
+   export REDIS_URL="redis://localhost:6379/0"
+   export CELERY_BROKER_URL="redis://localhost:6379/0"
+   export CELERY_RESULT_BACKEND="redis://localhost:6379/0"
+   ```
+4. **Start Celery worker:**
+   ```bash
+   cd services/runner-service
+   source venv/bin/activate
+   celery -A app.celery_app worker --loglevel=info
+   ```
 
 ## Running in Production
 
@@ -187,8 +336,17 @@ npm run build
 
 This creates an optimized production build in the `build` directory.
 
-**Backend:**
+**Backend Services:**
 ```bash
+# Gateway
+cd services/gateway
+mvn clean package -DskipTests
+
+# Auth Service
+cd services/auth-service
+mvn clean package -DskipTests
+
+# Workflow Service
 cd services/workflow-service
 mvn clean package -DskipTests
 ```
@@ -204,19 +362,34 @@ docker-compose up
 
 This will start:
 - PostgreSQL database
+- Redis
+- Gateway service
+- Auth service
 - Workflow service
-- Runner service (when implemented)
-- Frontend (when configured)
+- Runner API service
+- Runner worker (Celery)
+- Frontend
 
 ## Troubleshooting
 
 ### Port Already in Use
 
-If port 8080 or 3000 is already in use:
+If a port is already in use:
 
-**Backend (port 8080):**
+**Gateway (port 8080):**
+- Edit `services/gateway/src/main/resources/application.yml`
+- Change `server.port: 8080` to another port
+
+**Auth Service (port 8090):**
+- Edit `services/auth-service/src/main/resources/application.yml`
+- Change `server.port: 8090` to another port
+
+**Workflow Service (port 8082):**
 - Edit `services/workflow-service/src/main/resources/application.yml`
-- Change `server.port: 8080` to another port (e.g., `8081`)
+- Change `server.port: 8082` to another port
+
+**Runner Service (port 8081):**
+- Change the port in the uvicorn command: `uvicorn app.main:app --host 0.0.0.0 --port 8082`
 
 **Frontend (port 3000):**
 - The React dev server will automatically suggest an alternative port
@@ -224,10 +397,14 @@ If port 8080 or 3000 is already in use:
 
 ### Database Connection Issues
 
-If using PostgreSQL and experiencing connection issues:
+**H2/SQLite (Development):**
+- No configuration needed - works out of the box
+- Data is stored in memory (H2) or local file (SQLite)
+
+**PostgreSQL:**
 1. Verify PostgreSQL is running: `pg_isready`
 2. Check database exists: `psql -l | grep flowforge`
-3. Verify credentials in `application.yml`
+3. Verify credentials in service configuration files
 4. Check PostgreSQL logs for errors
 
 ### Frontend Build Errors
@@ -244,14 +421,50 @@ If Maven build fails:
 2. Delete `target` directory
 3. Run `mvn clean package -DskipTests` again
 
+### Python/Virtual Environment Issues
+
+If Python dependencies fail:
+1. Ensure you're using Python 3.10+
+2. Create a fresh virtual environment:
+   ```bash
+   cd services/runner-service
+   rm -rf venv
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+### CORS Errors
+
+If you see CORS errors in the browser:
+- Ensure the gateway is running and properly configured
+- Check that `REACT_APP_API_URL` in frontend matches the gateway URL
+- Verify gateway CORS configuration allows `http://localhost:3000`
+
+### JWT/Authentication Errors
+
+If authentication fails:
+- Ensure JWT_SECRET matches in gateway and auth-service
+- Check that tokens are being sent in Authorization header
+- Verify auth-service is running and accessible
+
+## Service Startup Order
+
+For best results, start services in this order:
+
+1. **Auth Service** (port 8090)
+2. **Workflow Service** (port 8082)
+3. **Runner Service** (port 8081)
+4. **Gateway** (port 8080) - depends on other services
+5. **Frontend** (port 3000) - depends on gateway
+
 ## Next Steps
 
 - Explore the [Architecture Documentation](./docs/architecture.md) to understand the system design
+- Review the [Security Documentation](./docs/SECURITY.md) for security best practices
 - Review the [README.md](./README.md) for feature overview
 - Start building your workflows!
 
 ## Support
 
 For issues or questions, please refer to the project documentation or create an issue in the repository.
-
-

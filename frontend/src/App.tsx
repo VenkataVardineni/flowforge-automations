@@ -521,16 +521,15 @@ function App() {
                 )}
               </>
             ) : (
-              <EmptyState onCreateFirstWorkflow={() => addNode('trigger', 'Webhook Trigger')} />
+              <EmptyState onCreateFirstWorkflow={() => addNode('webhookTrigger', 'Webhook Trigger')} />
             )}
-          )}
-          {isConsoleOpen && (
-            <RunConsole
-              runId={currentRunId}
-              isOpen={isConsoleOpen}
-              onClose={() => setIsConsoleOpen(false)}
-            />
-          )}
+            {isConsoleOpen && (
+              <RunConsole
+                runId={currentRunId}
+                isOpen={isConsoleOpen}
+                onClose={() => setIsConsoleOpen(false)}
+              />
+            )}
           </ReactFlowProvider>
         )}
       </div>

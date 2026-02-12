@@ -22,19 +22,32 @@ interface WorkflowsListProps {
   orgId?: string | null;
 }
 
-const WorkflowsList: React.FC<WorkflowsListProps> = ({ onSelectWorkflow, onCreateNew }) => {
+const WorkflowsList: React.FC<WorkflowsListProps> = ({ onSelectWorkflow, onCreateNew, authToken, orgId }) => {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchWorkflows = async () => {
+    if (!authToken || !orgId) {
+      setLoading(false);
+      setError('Please login to view workflows');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('http://localhost:8080/api/workflows?workspaceId=00000000-0000-0000-0000-000000000000');
+      const response = await fetch(`http://localhost:8080/api/workflows?workspaceId=${orgId}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'X-Org-Id': orgId || '',
+        },
+      });
       if (response.ok) {
         const data = await response.json();
         setWorkflows(data);
+      } else if (response.status === 401) {
+        setError('Please login to view workflows');
       } else {
         setError('Failed to load workflows');
       }
@@ -48,7 +61,7 @@ const WorkflowsList: React.FC<WorkflowsListProps> = ({ onSelectWorkflow, onCreat
 
   useEffect(() => {
     fetchWorkflows();
-  }, []);
+  }, [authToken, orgId]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

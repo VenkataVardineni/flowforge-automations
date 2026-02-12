@@ -4,7 +4,10 @@ import com.flowforge.workflow.dto.CreateWorkflowRequest;
 import com.flowforge.workflow.dto.SaveVersionRequest;
 import com.flowforge.workflow.dto.WorkflowResponse;
 import com.flowforge.workflow.model.WorkflowVersion;
+import com.flowforge.workflow.service.AuthorizationService;
+import com.flowforge.workflow.service.AuditService;
 import com.flowforge.workflow.service.WorkflowService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -16,7 +19,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/workflows")
-@CrossOrigin(origins = "*")
+// CORS handled by gateway - no need for @CrossOrigin here
 public class WorkflowController {
     private final WorkflowService workflowService;
     private final AuthorizationService authorizationService;

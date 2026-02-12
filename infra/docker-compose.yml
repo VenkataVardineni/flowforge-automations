@@ -29,15 +29,35 @@ services:
       timeout: 5s
       retries: 5
 
+  auth-service:
+    build:
+      context: ../services/auth-service
+      dockerfile: Dockerfile
+    container_name: flowforge-auth-service
+    ports:
+      - "8090:8090"
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/flowforge
+      DATABASE_USER: flowforge
+      DATABASE_PASSWORD: flowforge
+      JWT_SECRET: ${JWT_SECRET:-changeme-super-secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   workflow-service:
     build:
       context: ../services/workflow-service
       dockerfile: Dockerfile
     container_name: flowforge-workflow-service
+    ports:
+      - "8080:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowforge
       SPRING_DATASOURCE_USERNAME: flowforge
       SPRING_DATASOURCE_PASSWORD: flowforge
+      JWT_SECRET: ${JWT_SECRET:-changeme-super-secret}
     depends_on:
       postgres:
         condition: service_healthy
@@ -115,6 +135,7 @@ services:
       runner-api:
         condition: service_started
     restart: unless-stopped
+    command: java -jar /app/app.jar
 
 volumes:
   postgres_data:

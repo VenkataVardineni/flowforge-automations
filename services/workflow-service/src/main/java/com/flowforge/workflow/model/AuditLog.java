@@ -27,8 +27,8 @@ public class AuditLog {
     @Column(name = "resource_id")
     private UUID resourceId;
 
-    @Column(columnDefinition = "jsonb")
-    private String details; // JSON string
+    @Column(columnDefinition = "CLOB")
+    private String details; // JSON string (CLOB for H2 compatibility)
 
     @Column(name = "ip_address", length = 45)
     private String ipAddress;

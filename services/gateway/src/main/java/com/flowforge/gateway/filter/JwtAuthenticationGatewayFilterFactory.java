@@ -29,6 +29,13 @@ public class JwtAuthenticationGatewayFilterFactory extends AbstractGatewayFilter
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {
             String path = exchange.getRequest().getPath().value();
+            String method = exchange.getRequest().getMethod().name();
+            
+            // Allow OPTIONS requests for CORS preflight
+            if ("OPTIONS".equals(method)) {
+                return chain.filter(exchange);
+            }
+            
             // Skip auth for public paths
             if (path.startsWith("/actuator") || path.startsWith("/auth") || path.startsWith("/public") || "/health".equals(path)) {
                 return chain.filter(exchange);

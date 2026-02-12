@@ -31,17 +31,24 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
-        AuthService.LoginResponse response = authService.login(
-                request.getEmail(),
-                request.getPassword()
-        );
-        LoginResponse dto = new LoginResponse();
-        dto.setUserId(response.getUserId());
-        dto.setOrgId(response.getOrgId());
-        dto.setToken(response.getToken());
-        dto.setRole(response.getRole());
-        return ResponseEntity.ok(dto);
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+        try {
+            AuthService.LoginResponse response = authService.login(
+                    request.getEmail(),
+                    request.getPassword()
+            );
+            LoginResponse dto = new LoginResponse();
+            dto.setUserId(response.getUserId());
+            dto.setOrgId(response.getOrgId());
+            dto.setToken(response.getToken());
+            dto.setRole(response.getRole());
+            return ResponseEntity.ok(dto);
+        } catch (RuntimeException e) {
+            // Return 401 for invalid credentials
+            return ResponseEntity.status(401).body(
+                    java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Invalid credentials")
+            );
+        }
     }
 
     @PostMapping("/orgs/{orgId}/invites")

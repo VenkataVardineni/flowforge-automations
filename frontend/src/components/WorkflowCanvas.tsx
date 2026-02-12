@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useMemo } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -21,6 +21,63 @@ interface WorkflowCanvasProps {
   onNodeSelect: (node: WorkflowNode | null) => void;
   nodeStatuses?: Record<string, string>;
 }
+
+// Generic node renderer that uses the schema definitions for display
+// Defined outside component to prevent recreation on each render
+const AutomationNode = React.memo(({ data }: { data: any }) => {
+  const def = getNodeDefinition(data.type);
+  const status = data.status;
+  
+  const getStatusBadge = () => {
+    if (!status) return null;
+    const statusConfig: Record<string, { icon: string; class: string }> = {
+      queued: { icon: '⏸️', class: 'status-queued' },
+      running: { icon: '⏳', class: 'status-running' },
+      succeeded: { icon: '✅', class: 'status-succeeded' },
+      failed: { icon: '❌', class: 'status-failed' },
+      skipped: { icon: '⏭️', class: 'status-skipped' },
+    };
+    const config = statusConfig[status];
+    if (!config) return null;
+    return (
+      <span className={`node-status-badge ${config.class}`}>
+        {config.icon}
+      </span>
+    );
+  };
+  
+  return (
+    <div className="automation-node">
+      <div className="automation-node-header">
+        <span className="automation-node-icon">{def?.icon || '⬜'}</span>
+        <span className="automation-node-title">{def?.label || data.label}</span>
+        {getStatusBadge()}
+      </div>
+      <div className="automation-node-body">
+        {data.properties && Object.keys(data.properties).length > 0 ? (
+          <div className="automation-node-preview">
+            {Object.entries(data.properties)
+              .slice(0, 3)
+              .map(([key, value]) => (
+                <div key={key} className="automation-node-preview-row">
+                  <span className="preview-key">{key}</span>
+                  <span className="preview-value">
+                    {String(value).length > 24
+                      ? String(value).slice(0, 24) + '…'
+                      : String(value)}
+                  </span>
+                </div>
+              ))}
+          </div>
+        ) : (
+          <div className="automation-node-empty">No configuration yet</div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+AutomationNode.displayName = 'AutomationNode';
 
 const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   nodes,
@@ -98,7 +155,9 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     };
   });
 
-  const nodeTypes = {
+  // Memoize nodeTypes to prevent React Flow warnings
+  const nodeTypes = useMemo(() => ({
+    trigger: AutomationNode, // Fallback for generic trigger nodes
     webhookTrigger: AutomationNode,
     scheduleTrigger: AutomationNode,
     httpRequest: AutomationNode,
@@ -106,61 +165,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     ifCondition: AutomationNode,
     postgresWrite: AutomationNode,
     notification: AutomationNode,
-  };
-
-  // Generic node renderer that uses the schema definitions for display
-  function AutomationNode({ data }: { data: any }) {
-    const def = getNodeDefinition(data.type);
-    const status = data.status;
-    
-    const getStatusBadge = () => {
-      if (!status) return null;
-      const statusConfig: Record<string, { icon: string; class: string }> = {
-        queued: { icon: '⏸️', class: 'status-queued' },
-        running: { icon: '⏳', class: 'status-running' },
-        succeeded: { icon: '✅', class: 'status-succeeded' },
-        failed: { icon: '❌', class: 'status-failed' },
-        skipped: { icon: '⏭️', class: 'status-skipped' },
-      };
-      const config = statusConfig[status];
-      if (!config) return null;
-      return (
-        <span className={`node-status-badge ${config.class}`}>
-          {config.icon}
-        </span>
-      );
-    };
-    
-    return (
-      <div className="automation-node">
-        <div className="automation-node-header">
-          <span className="automation-node-icon">{def?.icon || '⬜'}</span>
-          <span className="automation-node-title">{def?.label || data.label}</span>
-          {getStatusBadge()}
-        </div>
-        <div className="automation-node-body">
-          {data.properties && Object.keys(data.properties).length > 0 ? (
-            <div className="automation-node-preview">
-              {Object.entries(data.properties)
-                .slice(0, 3)
-                .map(([key, value]) => (
-                  <div key={key} className="automation-node-preview-row">
-                    <span className="preview-key">{key}</span>
-                    <span className="preview-value">
-                      {String(value).length > 24
-                        ? String(value).slice(0, 24) + '…'
-                        : String(value)}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          ) : (
-            <div className="automation-node-empty">No configuration yet</div>
-          )}
-        </div>
-      </div>
-    );
-  }
+  }), []);
 
   return (
     <div className="workflow-canvas" ref={reactFlowWrapper}>

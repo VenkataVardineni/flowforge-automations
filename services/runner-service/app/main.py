@@ -37,14 +37,23 @@ app.add_middleware(
 async def health_check():
     return {"status": "healthy"}
 
+def get_db_dependency(request: Request):
+    """Dependency factory that provides database session with request context"""
+    return Depends(lambda: next(get_db(request)))
+
+def make_db_dep(request: Request):
+    """Create a database dependency for a specific request"""
+    return Depends(lambda: next(get_db(request)))
+
 @app.post("/runs", response_model=RunResponse, status_code=201)
 async def create_run(
     request: CreateRunRequest,
     http_request: Request,
     x_org_id: Optional[str] = Header(None, alias="X-Org-Id"),
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
-    db: Session = Depends(lambda: next(get_db(http_request)))
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role")
 ):
+    # Get database session with request context
+    db = next(get_db(http_request))
     """
     Create a new workflow run and enqueue it for execution.
     Returns immediately with the run record.
@@ -60,22 +69,28 @@ async def create_run(
         org_id=org_id,
         status=RunStatus.PENDING
     )
-    db.add(run)
-    db.commit()
-    db.refresh(run)
-    
-    # Enqueue the workflow execution task
-    execute_workflow.delay(str(run.id))
-    
-    logger.info(f"Created run {run.id} for workflow {request.workflow_id} and enqueued for execution")
-    
-    return run
+    try:
+        db.add(run)
+        db.commit()
+        db.refresh(run)
+        
+        # Enqueue the workflow execution task (will fail if Redis not available, but that's OK)
+        try:
+            execute_workflow.delay(str(run.id))
+        except Exception as e:
+            logger.warning(f"Failed to enqueue workflow task (Redis may not be running): {e}")
+        
+        logger.info(f"Created run {run.id} for workflow {request.workflow_id}")
+        
+        return run
+    finally:
+        db.close()
 
 @app.get("/runs/{run_id}", response_model=RunResponse)
 async def get_run(
     run_id: UUID,
     http_request: Request,
-    db: Session = Depends(lambda: next(get_db(http_request)))
+    db: Session = Depends(lambda: get_db_session(http_request))
 ):
     """Get run details by ID"""
     run = db.query(Run).filter(Run.id == run_id).first()
@@ -88,7 +103,7 @@ async def list_runs(
     workflow_id: Optional[UUID] = None,
     limit: int = 100,
     http_request: Request = None,
-    db: Session = Depends(lambda: next(get_db(http_request)) if http_request else next(get_db()))
+    db: Session = Depends(lambda: get_db_session(http_request) if http_request else get_db_session())
 ):
     """List runs, optionally filtered by workflow_id"""
     query = db.query(Run)
@@ -101,7 +116,7 @@ async def list_runs(
 async def get_run_steps(
     run_id: UUID,
     http_request: Request,
-    db: Session = Depends(lambda: next(get_db(http_request)))
+    db: Session = Depends(lambda: get_db_session(http_request))
 ):
     """Get all step runs for a given run"""
     run = db.query(Run).filter(Run.id == run_id).first()
@@ -116,7 +131,7 @@ async def get_step_run(
     run_id: UUID,
     step_id: UUID,
     http_request: Request,
-    db: Session = Depends(lambda: next(get_db(http_request)))
+    db: Session = Depends(lambda: get_db_session(http_request))
 ):
     """Get a specific step run"""
     step = db.query(StepRun).filter(
@@ -128,7 +143,7 @@ async def get_step_run(
     return step
 
 @app.get("/runs/{run_id}/events")
-async def stream_run_events(run_id: UUID, http_request: Request, db: Session = Depends(lambda: next(get_db(http_request)))):
+async def stream_run_events(run_id: UUID, http_request: Request, db: Session = Depends(lambda: get_db_session(http_request))):
     """
     Server-Sent Events (SSE) stream for run execution events.
     Emits: run_started, step_started, step_succeeded, step_failed, run_finished

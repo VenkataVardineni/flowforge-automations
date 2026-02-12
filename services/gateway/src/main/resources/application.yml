@@ -1,5 +1,5 @@
 server:
-  port: 8085
+  port: 8080
 
 spring:
   application:
@@ -15,21 +15,21 @@ spring:
         - PreserveHostHeader
       routes:
         - id: workflow-service
-          uri: http://workflow-service:8080
+          uri: http://localhost:8082
           predicates:
             - Path=/api/workflows/**, /api/workflow/**, /api/audit/**
           filters:
             - StripPrefix=1
 
         - id: runner-service
-          uri: http://runner-api:8081
+          uri: http://localhost:8081
           predicates:
             - Path=/api/runs/**, /api/run/**, /api/events/**
           filters:
             - StripPrefix=1
 
         - id: auth-service
-          uri: http://auth-service:8090
+          uri: http://localhost:8090
           predicates:
             - Path=/auth/**, /api/auth/**
 
@@ -43,6 +43,6 @@ management:
 
 security:
   jwt:
-    secret: ${JWT_SECRET:changeme-super-secret}
+    secret: ${JWT_SECRET:changeme-super-secret-key-for-jwt-signing}
 
 
